@@ -11,7 +11,8 @@ public sealed class GetAggregationEndpoint : IEndpoint
         "q and city are passed to the sources that support them; category and the inclusive from/to range " +
         "are applied to every item. Relevance is a 0–1 heuristic normalised per source. " +
         "Returns 200 when at least one source produced data, including cached or fallback data, so a 200 can " +
-        "still list failed sources: read sources[] to detect degradation. Returns 400 for invalid parameters, " +
+        "still list failed sources: read sources[] to detect degradation. Each source's answer is cached per search, " +
+        "so Cached and Fallback entries give the data's age in ageSeconds. Returns 400 for invalid parameters, " +
         "including unknown sources or categories, and 503 when every source failed.";
 
     public void Map(IEndpointRouteBuilder group) =>

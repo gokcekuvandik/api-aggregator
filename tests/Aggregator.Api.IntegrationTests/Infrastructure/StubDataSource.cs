@@ -17,7 +17,7 @@ internal sealed class StubDataSource(string name, SourceResult result) : IDataSo
     public static StubDataSource InState(string name, string state, int itemCount = 1) => new(name, state switch
     {
         "Success" => new SourceSuccess(Items(name, itemCount)),
-        "Cached" => new SourceCached(Items(name, itemCount)),
+        "Cached" => new SourceCached(Items(name, itemCount), TimeSpan.FromMinutes(2)),
         "Fallback" => new SourceFallback(Items(name, itemCount), TimeSpan.FromSeconds(90)),
         "Failed" => new SourceFailure($"{name} is unavailable"),
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown source state."),

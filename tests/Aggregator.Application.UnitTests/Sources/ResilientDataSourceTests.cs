@@ -13,6 +13,7 @@ public sealed class ResilientDataSourceTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ShortTimeout = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan StoredAge = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan LastKnownGoodLifetime = TimeSpan.FromHours(24);
     private static readonly DateTimeOffset Now = new(2026, 11, 21, 12, 0, 0, TimeSpan.Zero);
     private static readonly AggregationQuery Query = new(Page: 1, PageSize: 20);
 
@@ -70,7 +71,7 @@ public sealed class ResilientDataSourceTests
     {
         if (stored)
         {
-            _store.Save(LastKnownGoodKey.For(Name, Query), new LastKnownGood(TestItems.Many(1, "stored"), Now - StoredAge));
+            _store.Save(Key(Query), new LastKnownGood(TestItems.Many(1, "stored"), Now - StoredAge));
         }
 
         var source = Resilient(PrimaryProvider(primary), SecondaryProvider(secondary));
@@ -107,10 +108,18 @@ public sealed class ResilientDataSourceTests
 
         await source.FetchAsync(Query, TestContext.Current.CancellationToken);
 
-        var stored = _store.Find(LastKnownGoodKey.For(Name, Query)).ShouldNotBeNull();
+        var stored = _store.Find(Key(Query)).ShouldNotBeNull();
         stored.Items.Select(i => i.Id).ShouldBe(["primary-1"]);
         stored.StoredAt.ShouldBe(Now);
+        _store.Lifetimes.ShouldBe([LastKnownGoodLifetime]);
     }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Constructor_ShouldThrow_WhenLastKnownGoodLifetimeIsNotPositive(int seconds) =>
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            new ResilientDataSource(PrimaryProvider(Primary.Success), null, _store, _clock, TimeSpan.FromSeconds(seconds)));
 
     [Fact]
     public async Task FetchAsync_ShouldStoreSecondaryItems_WhenOnlySecondarySucceeds()
@@ -119,7 +128,7 @@ public sealed class ResilientDataSourceTests
 
         await source.FetchAsync(Query, TestContext.Current.CancellationToken);
 
-        _store.Find(LastKnownGoodKey.For(Name, Query)).ShouldNotBeNull().Items.Select(i => i.Id).ShouldBe(["secondary-1"]);
+        _store.Find(Key(Query)).ShouldNotBeNull().Items.Select(i => i.Id).ShouldBe(["secondary-1"]);
     }
 
     [Fact]
@@ -137,6 +146,7 @@ public sealed class ResilientDataSourceTests
     {
         var primary = Substitute.For<IDataSource>();
         primary.Name.Returns(Name);
+        primary.UsedFields.Returns(SearchFields.All);
         primary.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>())
             .Returns(new SourceSuccess(TestItems.Many(1, "primary")), new SourceFailure(PrimaryError));
         var source = Resilient(new SourceProvider(Name, primary, Timeout));
@@ -153,7 +163,7 @@ public sealed class ResilientDataSourceTests
     [Fact]
     public async Task FetchAsync_ShouldIgnoreStoredItemsOfAnotherSearch_WhenPrimaryFails()
     {
-        _store.Save(LastKnownGoodKey.For(Name, Query with { Text = "dotnet" }), new LastKnownGood(TestItems.Many(1, "stored"), Now));
+        _store.Save(Key(Query with { Text = "dotnet" }), new LastKnownGood(TestItems.Many(1, "stored"), Now));
         var source = Resilient(PrimaryProvider(Primary.Failure));
 
         var result = await source.FetchAsync(Query with { Text = "rust" }, TestContext.Current.CancellationToken);
@@ -164,7 +174,7 @@ public sealed class ResilientDataSourceTests
     [Fact]
     public async Task FetchAsync_ShouldThrowWithoutFallingBack_WhenCallerCancels()
     {
-        _store.Save(LastKnownGoodKey.For(Name, Query), new LastKnownGood(TestItems.Many(1, "stored"), Now));
+        _store.Save(Key(Query), new LastKnownGood(TestItems.Many(1, "stored"), Now));
         var secondary = SecondaryProvider(Secondary.Success)!;
         var source = Resilient(PrimaryProvider(Primary.Timeout), secondary);
         using var cts = new CancellationTokenSource();
@@ -180,6 +190,7 @@ public sealed class ResilientDataSourceTests
     {
         var primary = Substitute.For<IDataSource>();
         primary.Name.Returns(Name);
+        primary.UsedFields.Returns(SearchFields.All);
         primary.Categories.Returns([Name]);
         primary.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns<SourceResult>(_ => throw new InvalidOperationException("bug"));
         var source = Resilient(new SourceProvider(Name, primary, Timeout), SecondaryProvider(Secondary.Success));
@@ -226,43 +237,20 @@ public sealed class ResilientDataSourceTests
         Should.Throw<ArgumentOutOfRangeException>(() => new SourceProvider(Name, Substitute.For<IDataSource>(), TimeSpan.FromMilliseconds(milliseconds)));
 
     [Fact]
-    public void LastKnownGoodKey_ShouldIgnoreCaseCategorySortAndPaging_WhenBuilt()
+    public void UsedFields_ShouldCombinePrimaryAndSecondaryFields_WhenComposed()
     {
-        var query = Query with { Text = "DotNet", City = "Athens" };
-        var other = new AggregationQuery(Page: 3, PageSize: 5)
-        {
-            Text = "dotnet",
-            City = "ATHENS",
-            Category = "weather",
-            SortBy = Application.Aggregation.Sorting.ItemSortField.Date,
-        };
+        var primary = TestSources.Returning(Name, new SourceSuccess([]), SearchFields.City);
+        var secondary = TestSources.Returning(Name, new SourceSuccess([]), SearchFields.City | SearchFields.From);
 
-        LastKnownGoodKey.For("Weather", query).ShouldBe(LastKnownGoodKey.For("weather", other));
+        Resilient(new SourceProvider(Name, primary, Timeout), new SourceProvider(SecondaryName, secondary, Timeout))
+            .UsedFields.ShouldBe(SearchFields.City | SearchFields.From);
+        Resilient(new SourceProvider(Name, primary, Timeout)).UsedFields.ShouldBe(SearchFields.City);
     }
 
-    [Fact]
-    public void LastKnownGoodKey_ShouldDiffer_WhenSearchTextContainsTheSeparator() =>
-        LastKnownGoodKey.For(Name, Query with { Text = "a|city=b" })
-            .ShouldNotBe(LastKnownGoodKey.For(Name, Query with { Text = "a", City = "b|city=" }));
-
-    [Fact]
-    public void LastKnownGoodKey_ShouldDiffer_WhenSearchFieldsDiffer()
-    {
-        var keys = new[]
-        {
-            LastKnownGoodKey.For(Name, Query),
-            LastKnownGoodKey.For("news", Query),
-            LastKnownGoodKey.For(Name, Query with { Text = "a" }),
-            LastKnownGoodKey.For(Name, Query with { City = "a" }),
-            LastKnownGoodKey.For(Name, Query with { From = Now }),
-            LastKnownGoodKey.For(Name, Query with { To = Now }),
-        };
-
-        keys.Distinct(StringComparer.Ordinal).Count().ShouldBe(keys.Length);
-    }
+    private static string Key(AggregationQuery query) => SourceCacheKey.For(Name, SearchFields.All, query);
 
     private ResilientDataSource Resilient(SourceProvider primary, SourceProvider? secondary = null) =>
-        new(primary, secondary, _store, _clock);
+        new(primary, secondary, _store, _clock, LastKnownGoodLifetime);
 
     private static SourceProvider PrimaryProvider(Primary outcome) => new(Name, outcome switch
     {
@@ -285,6 +273,7 @@ public sealed class ResilientDataSourceTests
         var source = Substitute.For<IDataSource>();
         source.Name.Returns(name);
         source.Categories.Returns([name]);
+        source.UsedFields.Returns(SearchFields.All);
         source.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>())
             .Returns(call => WaitForCancellationAsync(call.Arg<CancellationToken>()));
         return source;
@@ -302,17 +291,19 @@ public sealed class ResilientDataSourceTests
 
         public int Count => _entries.Count;
 
+        public List<TimeSpan> Lifetimes { get; } = [];
+
         public LastKnownGood? Find(string key) => _entries.GetValueOrDefault(key);
 
         public void Save(string key, LastKnownGood entry) => _entries[key] = entry;
-    }
 
-    private sealed class StubClock(DateTimeOffset now) : TimeProvider
-    {
-        private DateTimeOffset _now = now;
+        public ValueTask<LastKnownGood?> FindAsync(string key, CancellationToken cancellationToken) => ValueTask.FromResult(Find(key));
 
-        public void Advance(TimeSpan by) => _now += by;
-
-        public override DateTimeOffset GetUtcNow() => _now;
+        public ValueTask SaveAsync(string key, LastKnownGood entry, TimeSpan lifetime, CancellationToken cancellationToken)
+        {
+            Save(key, entry);
+            Lifetimes.Add(lifetime);
+            return ValueTask.CompletedTask;
+        }
     }
 }

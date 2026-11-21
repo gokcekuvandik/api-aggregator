@@ -5,6 +5,8 @@ using Aggregator.Api.IntegrationTests.Infrastructure;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 
+using static Aggregator.Api.IntegrationTests.Infrastructure.AggregationBody;
+
 namespace Aggregator.Api.IntegrationTests.Sources;
 
 /// <summary>ADR-0006 end to end: parallel fan-out, the fault matrix, the secondary provider, last-known-good data and the circuit breaker.</summary>
@@ -35,7 +37,7 @@ public sealed class ResilienceTests : IClassFixture<AggregatorApiFactory>, IClas
         StubDelayed(UpstreamServer.OpenMeteoPath, "open-meteo-forecast.json", FastDelay);
         StubDelayed(UpstreamServer.HackerNewsPath, "hn-search.json", MediumDelay);
         StubDelayed(UpstreamServer.GitHubPath, "github-search.json", SlowDelay);
-        using var client = _factory.CreateClientWithUpstreams(_upstream.Settings());
+        using var client = _factory.CreateClientWithUpstreams(_upstream.SettingsWithoutCache());
         await GetAggregationAsync(client);
         var started = Stopwatch.GetTimestamp();
 
@@ -47,21 +49,14 @@ public sealed class ResilienceTests : IClassFixture<AggregatorApiFactory>, IClas
         elapsed.ShouldBeLessThan(FastDelay + MediumDelay + SlowDelay);
     }
 
-    private static readonly (string Source, string Path)[] Upstreams =
-    [
-        ("weather", UpstreamServer.OpenMeteoPath),
-        ("news", UpstreamServer.HackerNewsPath),
-        ("repositories", UpstreamServer.GitHubPath),
-    ];
-
-    public static TheoryData<string, string> SourcePaths => new(Upstreams.Select(upstream => (upstream.Source, upstream.Path)));
+    public static TheoryData<string, string> SourcePaths => new(UpstreamServer.Upstreams.Select(upstream => (upstream.Source, upstream.Path)));
 
     public static TheoryData<string, string, int> StatusFaults
     {
         get
         {
             var data = new TheoryData<string, string, int>();
-            foreach (var (source, path) in Upstreams)
+            foreach (var (source, path) in UpstreamServer.Upstreams)
             {
                 data.Add(source, path, 500);
                 data.Add(source, path, 429);
@@ -128,7 +123,7 @@ public sealed class ResilienceTests : IClassFixture<AggregatorApiFactory>, IClas
     public async Task GetAggregation_ShouldServeLastKnownGoodItemsWithTheirAge_WhenSourceFailsLater()
     {
         _upstream.StubKeylessSources();
-        using var client = _factory.CreateClientWithUpstreams(_upstream.Settings());
+        using var client = _factory.CreateClientWithUpstreams(_upstream.SettingsWithoutCache());
         var live = await GetAggregationAsync(client);
         GivenGitHub().AtPriority(UpstreamServer.OverridePriority).RespondWith(Response.Create().WithStatusCode(500));
 
@@ -187,13 +182,4 @@ public sealed class ResilienceTests : IClassFixture<AggregatorApiFactory>, IClas
         using var response = await client.GetAsync(ApiRoutes.Aggregation, TestContext.Current.CancellationToken);
         return await response.ShouldBeJson(HttpStatusCode.OK);
     }
-
-    private static JsonElement Source(JsonElement body, string name) =>
-        body.GetProperty("sources").EnumerateArray().Single(s => s.GetProperty("name").GetString() == name);
-
-    private static Dictionary<string, string?> Statuses(JsonElement body) =>
-        body.GetProperty("sources").EnumerateArray().ToDictionary(s => s.GetProperty("name").GetString()!, s => s.GetProperty("status").GetString());
-
-    private static List<string?> Ids(JsonElement body) =>
-        [.. body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString())];
 }

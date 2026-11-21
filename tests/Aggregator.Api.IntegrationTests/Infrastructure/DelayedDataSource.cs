@@ -10,6 +10,8 @@ internal sealed class DelayedDataSource(IDataSource inner, TimeSpan delay) : IDa
 
     public IReadOnlyList<string> Categories => inner.Categories;
 
+    public SearchFields UsedFields => inner.UsedFields;
+
     public async Task<SourceResult> FetchAsync(AggregationQuery query, CancellationToken cancellationToken)
     {
         await Task.Delay(delay, cancellationToken);

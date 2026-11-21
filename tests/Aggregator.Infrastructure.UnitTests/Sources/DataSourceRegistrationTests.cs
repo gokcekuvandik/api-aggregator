@@ -56,7 +56,7 @@ public sealed class DataSourceRegistrationTests
     {
         using var provider = Build([]);
 
-        var source = provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<ResilientDataSource>();
+        var source = Composed(provider);
 
         source.Name.ShouldBe(Name);
         source.Primary.Source.ShouldBeOfType<FakeSource>();
@@ -73,7 +73,7 @@ public sealed class DataSourceRegistrationTests
             ["Sources:fake:Resilience:TotalRequestTimeout:Timeout"] = "00:00:03",
         });
 
-        provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<ResilientDataSource>().Primary.Timeout.ShouldBe(TimeSpan.FromSeconds(4));
+        Composed(provider).Primary.Timeout.ShouldBe(TimeSpan.FromSeconds(4));
     }
 
     [Theory]
@@ -93,7 +93,7 @@ public sealed class DataSourceRegistrationTests
     {
         using var provider = BuildWithSecondary([]);
 
-        var source = provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<ResilientDataSource>();
+        var source = Composed(provider);
 
         source.Primary.Source.ShouldBeOfType<FakeSource>();
         var secondary = source.Secondary.ShouldNotBeNull();
@@ -120,7 +120,7 @@ public sealed class DataSourceRegistrationTests
         options.ClientName.ShouldBe("fake-secondary");
         primaryClient.BaseAddress.ShouldBe(new Uri("https://primary.test/"));
         secondaryClient.BaseAddress.ShouldBe(new Uri("https://secondary.test/"));
-        provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<ResilientDataSource>().Secondary!.Timeout.ShouldBe(TimeSpan.FromSeconds(3));
+        Composed(provider).Secondary!.Timeout.ShouldBe(TimeSpan.FromSeconds(3));
     }
 
     [Fact]
@@ -247,6 +247,9 @@ public sealed class DataSourceRegistrationTests
         provider.GetFakeLogCollector().GetSnapshot().ShouldContain(record =>
             record.Category == typeof(RateLimitLoggingHandler).FullName && record.Level == LogLevel.Warning);
     }
+
+    private static ResilientDataSource Composed(ServiceProvider provider) =>
+        provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<CachedDataSource>().Inner.ShouldBeOfType<ResilientDataSource>();
 
     private static async Task ValidateAtStartupAsync(ServiceProvider provider) =>
         await provider.GetRequiredService<IAsyncStartupValidator>().ValidateAsync(TestContext.Current.CancellationToken);

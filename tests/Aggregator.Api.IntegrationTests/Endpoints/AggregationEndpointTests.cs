@@ -82,6 +82,21 @@ public sealed class AggregationEndpointTests(AggregatorApiFactory factory) : ICl
     }
 
     [Fact]
+    public async Task Get_ShouldReportCacheAgeAndProvider_WhenSourceWasServedFromTheCache()
+    {
+        var cached = new SourceCached([], TimeSpan.FromSeconds(120), Provider: "hacker-news");
+        using var client = factory.CreateClientWith(new StubDataSource("news", cached));
+
+        using var response = await client.GetAsync(Url, TestContext.Current.CancellationToken);
+
+        var source = (await response.ShouldBeJson(HttpStatusCode.OK)).GetProperty("sources")[0];
+        source.GetProperty("status").GetString().ShouldBe("Cached");
+        source.GetProperty("ageSeconds").GetDouble().ShouldBe(120);
+        source.GetProperty("provider").GetString().ShouldBe("hacker-news");
+        source.GetProperty("error").ValueKind.ShouldBe(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Get_ShouldReturnItemsAndPaging_WhenPageIsRequested()
     {
         using var client = factory.CreateClientWith(StubDataSource.InState("news", "Success", itemCount: 5));

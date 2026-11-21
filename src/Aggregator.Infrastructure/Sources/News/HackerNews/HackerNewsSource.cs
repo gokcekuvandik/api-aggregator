@@ -19,6 +19,8 @@ internal sealed class HackerNewsSource(SourceFetcher fetcher, IOptions<HackerNew
 
     public IReadOnlyList<string> Categories { get; } = [SourceNames.News];
 
+    public SearchFields UsedFields => SearchFields.Text | SearchFields.From | SearchFields.To;
+
     public Task<SourceResult> FetchAsync(AggregationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);

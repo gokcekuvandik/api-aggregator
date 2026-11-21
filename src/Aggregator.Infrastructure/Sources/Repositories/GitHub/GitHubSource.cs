@@ -38,6 +38,8 @@ internal sealed class GitHubSource(SourceFetcher fetcher, IOptions<GitHubOptions
 
     public IReadOnlyList<string> Categories { get; } = [SourceNames.Repositories];
 
+    public SearchFields UsedFields => SearchFields.Text;
+
     public Task<SourceResult> FetchAsync(AggregationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
