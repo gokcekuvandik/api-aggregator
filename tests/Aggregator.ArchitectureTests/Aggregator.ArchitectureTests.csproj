@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 
   <ItemGroup>

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Aggregator.Api.IntegrationTests.Infrastructure;
 
@@ -25,8 +26,19 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
     public HttpClient CreateClientIn(string environment, params IDataSource[] sources) =>
         Create(services => ReplaceSources(services, sources), environment);
 
-    private HttpClient Create(Action<IServiceCollection> configure, string environment = "Development") =>
-        WithWebHostBuilder(builder => builder.UseEnvironment(environment).ConfigureTestServices(configure))
+    /// <summary>A Production client whose log entries land in <paramref name="logs"/>, with the app's own log filters applied.</summary>
+    public HttpClient CreateClientWithLogs(CapturingLoggerProvider logs, params IDataSource[] sources) =>
+        Create(services => ReplaceSources(services, sources), Environments.Production, logs);
+
+    private HttpClient Create(Action<IServiceCollection> configure, string environment = "Development", CapturingLoggerProvider? logs = null) =>
+        WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment(environment).ConfigureTestServices(configure);
+                if (logs is not null)
+                {
+                    builder.ConfigureLogging(logging => logging.AddProvider(logs));
+                }
+            })
             .CreateClient();
 
     private static void ReplaceSources(IServiceCollection services, IDataSource[] sources)
