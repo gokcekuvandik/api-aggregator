@@ -1,0 +1,38 @@
+using Aggregator.Api.Endpoints;
+using ArchUnitNET.xUnitV3;
+using static Aggregator.ArchitectureTests.ArchitectureFixture;
+using static ArchUnitNET.Fluent.ArchRuleDefinition;
+
+namespace Aggregator.ArchitectureTests;
+
+/// <summary>ADR-0002: one sealed <see cref="IEndpoint"/> per feature, talking only to Application ports.</summary>
+public sealed class EndpointConventionTests
+{
+    private const string EndpointsNamespacePattern = @"^Aggregator\.Api\.Endpoints(\..+)?$";
+
+    [Fact]
+    public void Endpoints_ShouldBeSealed_WhenTheyImplementIEndpoint() =>
+        Classes().That().ImplementInterface(typeof(IEndpoint))
+            .Should().BeSealed()
+            .Check(Architecture);
+
+    [Fact]
+    public void Endpoints_ShouldResideInEndpointsNamespace_WhenTheyImplementIEndpoint() =>
+        Classes().That().ImplementInterface(typeof(IEndpoint))
+            .Should().ResideInNamespaceMatching(EndpointsNamespacePattern)
+            .Check(Architecture);
+
+    [Fact]
+    public void Endpoints_ShouldNotDependOn_Infrastructure() =>
+        Types().That().ResideInNamespaceMatching(EndpointsNamespacePattern)
+            .Should().NotDependOnAny(Types().That().ResideInAssembly(InfrastructureAssembly))
+            .Check(Architecture);
+
+    [Fact]
+    public void EndpointScan_ShouldFindEveryFeature_WhenAssemblyIsLoaded() =>
+        ApiAssembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.IsAssignableTo(typeof(IEndpoint)))
+            .Select(type => type.Name)
+            .Order(StringComparer.Ordinal)
+            .ShouldBe(["GetAggregationEndpoint", "GetSourcesEndpoint", "GetStatisticsEndpoint"]);
+}
