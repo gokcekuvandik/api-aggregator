@@ -11,9 +11,15 @@ internal sealed record OpenMeteoDaily(
     [property: JsonPropertyName("temperature_2m_max")] IReadOnlyList<double?> TemperatureMax,
     [property: JsonPropertyName("temperature_2m_min")] IReadOnlyList<double?> TemperatureMin);
 
+/// <summary>A geocoding answer; <c>results</c> is left out entirely when nothing matches.</summary>
+internal sealed record OpenMeteoGeocoding(IReadOnlyList<OpenMeteoPlace>? Results = null);
+
+internal sealed record OpenMeteoPlace(string Name, double Latitude, double Longitude);
+
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
     RespectNullableAnnotations = true,
     RespectRequiredConstructorParameters = true)]
 [JsonSerializable(typeof(OpenMeteoForecast))]
+[JsonSerializable(typeof(OpenMeteoGeocoding))]
 internal sealed partial class OpenMeteoJsonContext : JsonSerializerContext;

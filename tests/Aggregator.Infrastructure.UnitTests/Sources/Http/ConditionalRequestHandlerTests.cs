@@ -160,18 +160,47 @@ public sealed class ConditionalRequestHandlerTests : IDisposable
     }
 
     [Fact]
-    public void Store_ShouldStopAddingKeys_WhenCapacityIsReached()
+    public void Store_ShouldEvictLeastRecentlyUsedKey_WhenCapacityIsReached()
+    {
+        var store = new ConditionalResponseStore(capacity: 2);
+        store.Set("a", Entry("1"));
+        store.Set("b", Entry("2"));
+        store.TryGet("a", out _);
+
+        store.Set("c", Entry("3"));
+
+        store.TryGet("b", out _).ShouldBeFalse();
+        store.TryGet("a", out _).ShouldBeTrue();
+        store.TryGet("c", out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Store_ShouldReplaceEntryWithoutEvicting_WhenKeyIsKnown()
+    {
+        var store = new ConditionalResponseStore(capacity: 2);
+        store.Set("a", Entry("1"));
+        store.Set("b", Entry("2"));
+
+        store.Set("a", Entry("4"));
+
+        store.TryGet("b", out _).ShouldBeTrue();
+        store.TryGet("a", out var updated).ShouldBeTrue();
+        updated!.ETag.Tag.ShouldBe("\"4\"");
+    }
+
+    [Fact]
+    public void Store_ShouldKeepAcceptingNewKeys_WhenManyDistinctUrlsArrive()
     {
         var store = new ConditionalResponseStore(capacity: 2);
 
-        store.Set("a", Entry("1"));
-        store.Set("b", Entry("2"));
-        store.Set("c", Entry("3"));
-        store.Set("a", Entry("4"));
+        foreach (var i in Enumerable.Range(0, 10))
+        {
+            store.Set($"k{i}", Entry(i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
 
-        store.TryGet("c", out _).ShouldBeFalse();
-        store.TryGet("a", out var updated).ShouldBeTrue();
-        updated!.ETag.Tag.ShouldBe("\"4\"");
+        store.TryGet("k9", out _).ShouldBeTrue();
+        store.TryGet("k8", out _).ShouldBeTrue();
+        store.TryGet("k0", out _).ShouldBeFalse();
     }
 
     private static StoredResponse Entry(string etag) => new(new EntityTagHeaderValue($"\"{etag}\""), [], "application/json");

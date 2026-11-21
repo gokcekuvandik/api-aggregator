@@ -14,7 +14,7 @@ public sealed class OpenApiContractTests(AggregatorApiFactory factory) : IClassF
 
         var parameters = document.GetProperty("paths").GetProperty(ApiRoutes.Aggregation).GetProperty("get").GetProperty("parameters");
 
-        parameters.EnumerateArray().Select(p => p.GetProperty("name").GetString()).ShouldBe(["page", "pageSize"]);
+        parameters.EnumerateArray().Select(p => p.GetProperty("name").GetString()).ShouldBe(["q", "city", "sources", "category", "from", "to", "sortBy", "sortOrder", "page", "pageSize"]);
     }
 
     [Fact]

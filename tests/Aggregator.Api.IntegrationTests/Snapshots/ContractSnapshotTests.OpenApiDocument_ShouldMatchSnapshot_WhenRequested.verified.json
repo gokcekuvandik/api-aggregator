@@ -16,9 +16,81 @@
           "Aggregator"
         ],
         "summary": "Aggregated items from all sources",
-        "description": "Fans out to every source and merges the results. Returns 200 when at least one source produced data, including cached or fallback data, so a 200 can still list failed sources: read sources[] to detect degradation. Returns 503 when every source failed.",
+        "description": "Fans out to the selected sources, then filters, sorts and pages the merged items. q and city are passed to the sources that support them; category and the inclusive from/to range are applied to every item. Relevance is a 0–1 heuristic normalised per source. Returns 200 when at least one source produced data, including cached or fallback data, so a 200 can still list failed sources: read sources[] to detect degradation. Returns 400 for invalid parameters, including unknown sources or categories, and 503 when every source failed.",
         "operationId": "GetAggregation",
         "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "city",
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sources",
+            "in": "query",
+            "schema": {
+              "maxLength": 200,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "maxLength": 50,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "sortBy",
+            "in": "query",
+            "description": "One of: relevance, date, source. Defaults to relevance.",
+            "schema": {
+              "maxLength": 50,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "in": "query",
+            "description": "One of: desc, asc. Defaults to desc.",
+            "schema": {
+              "maxLength": 50,
+              "minLength": 0,
+              "type": "string"
+            }
+          },
           {
             "name": "page",
             "in": "query",
@@ -191,6 +263,133 @@
           }
         }
       },
+      "ItemDetailsResponse": {
+        "required": [
+          "$type"
+        ],
+        "type": "object",
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/ItemDetailsResponseWeatherDetailsResponse"
+          },
+          {
+            "$ref": "#/components/schemas/ItemDetailsResponseNewsDetailsResponse"
+          },
+          {
+            "$ref": "#/components/schemas/ItemDetailsResponseRepositoryDetailsResponse"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "$type",
+          "mapping": {
+            "weather": "#/components/schemas/ItemDetailsResponseWeatherDetailsResponse",
+            "news": "#/components/schemas/ItemDetailsResponseNewsDetailsResponse",
+            "repository": "#/components/schemas/ItemDetailsResponseRepositoryDetailsResponse"
+          }
+        }
+      },
+      "ItemDetailsResponseNewsDetailsResponse": {
+        "required": [
+          "author",
+          "points",
+          "publisher"
+        ],
+        "type": "object",
+        "properties": {
+          "$type": {
+            "enum": [
+              "news"
+            ],
+            "type": "string"
+          },
+          "author": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "points": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "publisher": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ItemDetailsResponseRepositoryDetailsResponse": {
+        "required": [
+          "stars",
+          "forks",
+          "language"
+        ],
+        "type": "object",
+        "properties": {
+          "$type": {
+            "enum": [
+              "repository"
+            ],
+            "type": "string"
+          },
+          "stars": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "forks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "language": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ItemDetailsResponseWeatherDetailsResponse": {
+        "required": [
+          "location",
+          "minTemperature",
+          "maxTemperature",
+          "conditions"
+        ],
+        "type": "object",
+        "properties": {
+          "$type": {
+            "enum": [
+              "weather"
+            ],
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "minTemperature": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxTemperature": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "conditions": {
+            "type": "string"
+          }
+        }
+      },
       "ItemResponse": {
         "required": [
           "id",
@@ -199,7 +398,9 @@
           "title",
           "summary",
           "url",
-          "publishedAt"
+          "publishedAt",
+          "relevance",
+          "details"
         ],
         "type": "object",
         "properties": {
@@ -231,6 +432,13 @@
           "publishedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "relevance": {
+            "type": "number",
+            "format": "double"
+          },
+          "details": {
+            "$ref": "#/components/schemas/ItemDetailsResponse"
           }
         }
       },

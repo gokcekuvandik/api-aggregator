@@ -44,7 +44,7 @@ public sealed class ExternalSourceTests : IClassFixture<AggregatorApiFactory>, I
         var body = await GetAggregationAsync(client);
 
         Statuses(body).ShouldBe(new Dictionary<string, string?> { ["weather"] = "Success", ["news"] = "Success", ["repositories"] = "Success" });
-        Ids(body).ShouldBe(["weather:Athens:2026-11-21T00:00Z", "weather:Athens:2026-11-22T00:00Z", "news:4242", "news:4243", "repositories:17620347", "repositories:2"]);
+        Ids(body).ShouldBe(["weather:Athens:2026-11-21T00:00Z", "weather:Athens:2026-11-22T00:00Z", "news:4242", "news:4243", "repositories:17620347", "repositories:2"], ignoreOrder: true);
     }
 
     [Fact]
@@ -151,6 +151,38 @@ public sealed class ExternalSourceTests : IClassFixture<AggregatorApiFactory>, I
 
     private WireMock.Server.IRespondWithAProvider GivenGitHub() =>
         _upstream.Server.Given(Request.Create().WithPath(UpstreamServer.GitHubPath).UsingGet());
+
+    [Fact]
+    public async Task GetAggregation_ShouldGeocodeCityThenForecastThere_WhenCityIsGiven()
+    {
+        _upstream.Server.Given(Request.Create().WithPath(UpstreamServer.GeocodingPath).WithParam("name", "Paris").UsingGet())
+            .RespondWith(UpstreamServer.JsonResponse("open-meteo-geocoding.json"));
+        _upstream.Server.Given(Request.Create().WithPath(UpstreamServer.OpenMeteoPath).WithParam("latitude", "48.85341").WithParam("longitude", "2.3488").UsingGet())
+            .RespondWith(UpstreamServer.JsonResponse("open-meteo-forecast.json"));
+        using var client = _factory.CreateClientWithUpstreams(_upstream.Settings());
+
+        using var response = await client.GetAsync($"{ApiRoutes.Aggregation}?city=Paris&sources=weather", TestContext.Current.CancellationToken);
+
+        var body = await response.ShouldBeJson(HttpStatusCode.OK);
+        Statuses(body).ShouldBe(new Dictionary<string, string?> { ["weather"] = "Success" });
+        Ids(body).ShouldAllBe(id => id!.StartsWith("weather:Paris:", StringComparison.Ordinal));
+        body.GetProperty("items")[0].GetProperty("details").GetProperty("location").GetString().ShouldBe("Paris");
+    }
+
+    [Fact]
+    public async Task GetAggregation_ShouldReturnNoWeatherItemsRatherThan503_WhenCityIsUnknown()
+    {
+        _upstream.Server.Given(Request.Create().WithPath(UpstreamServer.GeocodingPath).UsingGet())
+            .RespondWith(Response.Create().WithStatusCode(200).WithHeader("Content-Type", "application/json").WithBody("""{"generationtime_ms":0.1}"""));
+        using var client = _factory.CreateClientWithUpstreams(_upstream.Settings());
+
+        using var response = await client.GetAsync($"{ApiRoutes.Aggregation}?city=Nowhere&sources=weather", TestContext.Current.CancellationToken);
+
+        var body = await response.ShouldBeJson(HttpStatusCode.OK);
+        Statuses(body).ShouldBe(new Dictionary<string, string?> { ["weather"] = "Success" });
+        Ids(body).ShouldBeEmpty();
+        _upstream.Server.LogEntries.ShouldNotContain(entry => entry.RequestMessage!.Path == UpstreamServer.OpenMeteoPath);
+    }
 
     private Dictionary<string, string?> KeyedSettings()
     {

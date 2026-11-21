@@ -5,6 +5,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="TestData\*.pict" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Aggregator.Application\Aggregator.Application.csproj" />
   </ItemGroup>
 

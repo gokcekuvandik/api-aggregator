@@ -10,23 +10,63 @@ namespace Aggregator.Infrastructure.Sources.Http;
 /// <summary>The last successful body for a URL and the ETag that identifies it.</summary>
 internal sealed record StoredResponse(EntityTagHeaderValue ETag, byte[] Body, string? MediaType);
 
-/// <summary>Stored responses by absolute URL; once full it keeps updating known URLs but stops adding new ones.</summary>
+/// <summary>
+/// Stored responses by absolute URL, bounded by evicting the least recently used URL.
+/// URLs carry request text, so the bound must keep making room rather than freeze on the first URLs seen.
+/// </summary>
 internal sealed class ConditionalResponseStore(int capacity = ConditionalResponseStore.DefaultCapacity)
 {
     public const int DefaultCapacity = 256;
 
-    private readonly ConcurrentDictionary<string, StoredResponse> _entries = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
+    private readonly Lock _evictionLock = new();
+    private long _clock;
 
-    public bool TryGet(string key, [NotNullWhen(true)] out StoredResponse? response) => _entries.TryGetValue(key, out response);
+    public bool TryGet(string key, [NotNullWhen(true)] out StoredResponse? response)
+    {
+        if (_entries.TryGetValue(key, out var entry))
+        {
+            entry.Touch(Tick());
+            response = entry.Response;
+            return true;
+        }
+
+        response = null;
+        return false;
+    }
 
     public void Set(string key, StoredResponse response)
     {
-        if (_entries.Count >= capacity && !_entries.ContainsKey(key))
+        if (!_entries.ContainsKey(key))
         {
-            return;
+            EvictIfFull();
         }
 
-        _entries[key] = response;
+        _entries[key] = new Entry(response, Tick());
+    }
+
+    private void EvictIfFull()
+    {
+        lock (_evictionLock)
+        {
+            while (_entries.Count >= capacity && _entries.MinBy(pair => pair.Value.LastUsed) is { Key: { } oldest })
+            {
+                _entries.TryRemove(oldest, out _);
+            }
+        }
+    }
+
+    private long Tick() => Interlocked.Increment(ref _clock);
+
+    private sealed class Entry(StoredResponse response, long lastUsed)
+    {
+        private long _lastUsed = lastUsed;
+
+        public StoredResponse Response { get; } = response;
+
+        public long LastUsed => Volatile.Read(ref _lastUsed);
+
+        public void Touch(long now) => Volatile.Write(ref _lastUsed, now);
     }
 }
 

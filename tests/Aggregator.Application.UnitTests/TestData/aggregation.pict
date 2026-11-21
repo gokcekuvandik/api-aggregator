@@ -1,0 +1,13 @@
+# Pairwise model for the filters and sorts of GET /api/v1/aggregation (ADR-0005, ADR-0014).
+# The rows in AggregationPairwiseCases.cs come from this model; a test proves they cover every allowed pair.
+# Regenerate with: pict aggregation.pict
+
+SortBy:    relevance, date, source
+SortOrder: asc, desc
+Category:  none, news, weather
+Sources:   all, news, weather+repositories
+DateRange: none, fromOnly, toOnly, both, equal
+
+# A category none of the selected sources serves is rejected with a 400, so it is not a filter case.
+IF [Sources] = "news" THEN [Category] <> "weather";
+IF [Sources] = "weather+repositories" THEN [Category] <> "news";

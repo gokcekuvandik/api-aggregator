@@ -1,11 +1,13 @@
 using Aggregator.Infrastructure.Sources.Http;
 using Aggregator.Infrastructure.Sources.News.HackerNews;
+using Aggregator.Infrastructure.Sources.Relevance;
 using Aggregator.Infrastructure.Sources.News.NewsApi;
 using Aggregator.Infrastructure.Sources.Repositories.GitHub;
 using Aggregator.Infrastructure.Sources.Weather.OpenMeteo;
 using Aggregator.Infrastructure.Sources.Weather.OpenWeatherMap;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Aggregator.Infrastructure.Sources;
 
@@ -16,6 +18,11 @@ internal static class SourceRegistration
 
     public static IServiceCollection AddSources(this IServiceCollection services, IConfiguration configuration)
     {
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<IRelevanceScorer<object>, RankRelevanceScorer>();
+        services.TryAddSingleton<IRelevanceScorer<RepositorySignal>, RepositoryRelevanceScorer>();
+        services.TryAddSingleton<IRelevanceScorer<DateTimeOffset>, WeatherRelevanceScorer>();
+
         if (HasApiKey(configuration, SourceNames.Weather))
         {
             services.AddDataSource<OpenWeatherMapSource, OpenWeatherMapOptions>(SourceNames.Weather);

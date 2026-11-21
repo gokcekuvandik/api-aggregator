@@ -11,7 +11,7 @@ internal sealed class DataSourceOptionsValidator<TOptions>(string section) : IVa
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        List<string> failures = [.. AddressFailures(options.BaseAddress)];
+        List<string> failures = [.. options.Addresses.SelectMany(entry => AddressFailures(entry.Key, entry.Address))];
         var results = new List<ValidationResult>();
         if (!Validator.TryValidateObject(options, new ValidationContext(options), results, validateAllProperties: true))
         {
@@ -21,9 +21,9 @@ internal sealed class DataSourceOptionsValidator<TOptions>(string section) : IVa
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 
-    private IEnumerable<string> AddressFailures(Uri? address)
+    private IEnumerable<string> AddressFailures(string setting, Uri? address)
     {
-        var key = $"{section}:{nameof(DataSourceOptions.BaseAddress)}";
+        var key = $"{section}:{setting}";
         if (address is null || address.OriginalString.Length == 0)
         {
             yield return $"{key} is required.";
