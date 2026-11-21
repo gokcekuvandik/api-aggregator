@@ -1,0 +1,128 @@
+using System.Runtime.CompilerServices;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace Aggregator.Api.IntegrationTests.Snapshots;
+
+/// <summary>
+/// Minimal JSON snapshot testing (ADR-0002 confirmation). The normalised JSON is compared with
+/// <c>{Class}.{Test}.verified.json</c> next to the test file.
+/// <list type="bullet">
+/// <item>On a mismatch, or when no snapshot exists yet, <c>.received.json</c> is written and the test fails.
+/// Review it and rename it to <c>.verified.json</c> to accept.</item>
+/// <item>With <c>AGGREGATOR_UPDATE_SNAPSHOTS=1</c> the verified file is overwritten instead.</item>
+/// </list>
+/// </summary>
+internal static class JsonSnapshot
+{
+    public const string ScrubbedValue = "{scrubbed}";
+    public const string UpdateVariable = "AGGREGATOR_UPDATE_SNAPSHOTS";
+
+    /// <summary>Members whose values change on every run; the snapshot pins only their presence.</summary>
+    public static readonly IReadOnlySet<string> VolatileMembers = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "traceId",
+        "durationMs",
+    };
+
+    // Relaxed escaping keeps snapshots readable ("+00:00", "application/problem+json").
+    // The files are only ever read by people and by this helper, never embedded in HTML.
+    private static readonly JsonSerializerOptions Indented = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    public static Task MatchAsync(
+        string json,
+        [CallerFilePath] string callerFile = "",
+        [CallerMemberName] string testName = "")
+    {
+        var directory = Path.GetDirectoryName(callerFile)
+            ?? throw new InvalidOperationException($"Cannot resolve the directory of '{callerFile}'.");
+        var name = $"{Path.GetFileNameWithoutExtension(callerFile)}.{testName}";
+        var update = Environment.GetEnvironmentVariable(UpdateVariable) == "1";
+        return MatchAsync(json, directory, name, update);
+    }
+
+    internal static async Task MatchAsync(string json, string directory, string name, bool update)
+    {
+        var actual = Normalize(json);
+        var verifiedPath = Path.Combine(directory, $"{name}.verified.json");
+        var receivedPath = Path.Combine(directory, $"{name}.received.json");
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        if (update)
+        {
+            await File.WriteAllTextAsync(verifiedPath, actual, cancellationToken);
+            File.Delete(receivedPath);
+            return;
+        }
+
+        if (File.Exists(verifiedPath))
+        {
+            var verified = NormalizeNewLines(await File.ReadAllTextAsync(verifiedPath, cancellationToken));
+            if (verified == actual)
+            {
+                File.Delete(receivedPath);
+                return;
+            }
+
+            await File.WriteAllTextAsync(receivedPath, actual, cancellationToken);
+            Assert.Fail($"Snapshot mismatch for {name}. {FirstDifference(verified, actual)}\nReview {receivedPath} and rename it to .verified.json to accept.");
+        }
+
+        await File.WriteAllTextAsync(receivedPath, actual, cancellationToken);
+        Assert.Fail($"No snapshot for {name}. Review {receivedPath} and rename it to .verified.json to accept.");
+    }
+
+    /// <summary>Indented JSON with LF line endings and volatile member values replaced.</summary>
+    internal static string Normalize(string json)
+    {
+        var node = JsonNode.Parse(json) ?? throw new ArgumentException("The JSON is the literal null.", nameof(json));
+        Scrub(node);
+        return NormalizeNewLines(node.ToJsonString(Indented));
+    }
+
+    private static void Scrub(JsonNode node)
+    {
+        switch (node)
+        {
+            case JsonObject obj:
+                foreach (var key in obj.Select(p => p.Key).ToList())
+                {
+                    if (VolatileMembers.Contains(key) && obj[key] is not null)
+                    {
+                        obj[key] = ScrubbedValue;
+                    }
+                    else if (obj[key] is { } child)
+                    {
+                        Scrub(child);
+                    }
+                }
+
+                break;
+            case JsonArray array:
+                foreach (var item in array.OfType<JsonNode>())
+                {
+                    Scrub(item);
+                }
+
+                break;
+        }
+    }
+
+    private static string NormalizeNewLines(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n') + "\n";
+
+    private static string FirstDifference(string expected, string actual)
+    {
+        var expectedLines = expected.Split('\n');
+        var actualLines = actual.Split('\n');
+        var line = Enumerable.Range(0, Math.Min(expectedLines.Length, actualLines.Length))
+            .FirstOrDefault(i => expectedLines[i] != actualLines[i], Math.Min(expectedLines.Length, actualLines.Length));
+        var verified = line < expectedLines.Length ? expectedLines[line] : "<end of file>";
+        var received = line < actualLines.Length ? actualLines[line] : "<end of file>";
+        return $"First difference at line {line + 1}:\n  verified: {verified}\n  received: {received}";
+    }
+}
