@@ -13,4 +13,7 @@ public abstract class DataSourceOptions
     internal static string SectionFor(string sourceName) => $"{SectionName}:{sourceName}";
 
     public Uri? BaseAddress { get; set; }
+
+    /// <summary>Every upstream address the source calls, by setting name; each must pass the same checks as the base address.</summary>
+    internal virtual IEnumerable<(string Key, Uri? Address)> Addresses => [(nameof(BaseAddress), BaseAddress)];
 }

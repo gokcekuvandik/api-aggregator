@@ -1,8 +1,10 @@
 using Aggregator.Application.Aggregation;
+using Aggregator.Application.Aggregation.Sorting;
 using Aggregator.Application.Paging;
 using Aggregator.Application.Sources;
 using Aggregator.Application.UnitTests.TestData;
 using NSubstitute;
+using SortDirection = Aggregator.Application.Aggregation.Sorting.SortDirection;
 
 namespace Aggregator.Application.UnitTests.Aggregation;
 
@@ -11,7 +13,7 @@ public sealed class AggregationServiceTests
     private static readonly AggregationQuery DefaultQuery = new(Page: 1, PageSize: PageRequest.DefaultPageSize);
 
     [Fact]
-    public async Task AggregateAsync_ShouldMergeItemsInSourceOrder_WhenSourcesReturnData()
+    public async Task AggregateAsync_ShouldMergeItemsFromEverySource_WhenSourcesReturnData()
     {
         var service = Service(
             Source("news", new SourceSuccess(TestItems.Many(2, "news"))),
@@ -79,14 +81,88 @@ public sealed class AggregationServiceTests
         (await pending).Sources.Count.ShouldBe(2);
     }
 
+    [Fact]
+    public async Task AggregateAsync_ShouldCallOnlyNamedSources_WhenSourcesAreGiven()
+    {
+        var news = Source("news", new SourceSuccess([]));
+        var weather = Source("weather", new SourceSuccess([]));
+        var query = DefaultQuery with { Sources = ["WEATHER"] };
+
+        var result = await Service(news, weather).AggregateAsync(query, TestContext.Current.CancellationToken);
+
+        result.Sources.Select(s => s.Name).ShouldBe(["weather"]);
+        await news.DidNotReceive().FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AggregateAsync_ShouldSkipSourcesWithoutCategory_WhenCategoryIsGiven()
+    {
+        var news = Source("news", new SourceSuccess([]));
+        var weather = Source("weather", new SourceSuccess([TestItems.Item("w", source: "weather", category: "weather")]));
+        var query = DefaultQuery with { Category = "Weather" };
+
+        var result = await Service(news, weather).AggregateAsync(query, TestContext.Current.CancellationToken);
+
+        result.Items.Items.Select(i => i.Id).ShouldBe(["w"]);
+        await news.DidNotReceive().FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AggregateAsync_ShouldFilterAndSortBeforePaging_WhenQueryHasCriteria()
+    {
+        var from = TestItems.PublishedAt.AddHours(-1);
+        var service = Service(Source("news", new SourceSuccess(
+        [
+            TestItems.Item("low", relevance: 0.1),
+            TestItems.Item("too-old", publishedAt: from.AddTicks(-1), relevance: 1),
+            TestItems.Item("high", relevance: 0.9),
+            TestItems.Item("mid", relevance: 0.5),
+        ])));
+        var query = new AggregationQuery(Page: 1, PageSize: 2) { From = from, SortBy = ItemSortField.Relevance, SortOrder = SortDirection.Descending };
+
+        var result = await service.AggregateAsync(query, TestContext.Current.CancellationToken);
+
+        result.Items.Items.Select(i => i.Id).ShouldBe(["high", "mid"]);
+        result.Items.TotalCount.ShouldBe(3);
+    }
+
+    [Fact]
+    public void Validate_ShouldReturnNoErrors_WhenQueryIsValid()
+    {
+        var query = DefaultQuery with { Sources = ["news"], Category = "NEWS" };
+
+        Service(Source("news", new SourceSuccess([]))).Validate(query).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Validate_ShouldRejectSource_WhenNameIsUnknown()
+    {
+        var errors = Service(Source("news", new SourceSuccess([]))).Validate(DefaultQuery with { Sources = ["news", "nope"] });
+
+        errors.ShouldHaveSingleItem().Key.ShouldBe(nameof(AggregationQuery.Sources));
+        errors[nameof(AggregationQuery.Sources)].ShouldBe(["Unknown source 'nope'. Known sources: news."]);
+    }
+
+    [Fact]
+    public void Validate_ShouldRejectCategory_WhenNoSourceServesIt()
+    {
+        var errors = Service(Source("news", new SourceSuccess([]))).Validate(DefaultQuery with { Category = "sports" });
+
+        errors.ShouldHaveSingleItem().Key.ShouldBe(nameof(AggregationQuery.Category));
+        errors[nameof(AggregationQuery.Category)].ShouldBe(["Unknown category 'sports'. Known categories: news."]);
+    }
+
+    [Fact]
+    public void Validate_ShouldRejectCategory_WhenSelectedSourcesDoNotServeIt()
+    {
+        var service = Service(Source("news", new SourceSuccess([])), Source("weather", new SourceSuccess([])));
+
+        var errors = service.Validate(DefaultQuery with { Sources = ["weather"], Category = "news" });
+
+        errors[nameof(AggregationQuery.Category)].ShouldBe(["None of the selected sources serves category 'news'."]);
+    }
+
     private static AggregationService Service(params IDataSource[] sources) => new(new DataSourceRegistry(sources));
 
-    private static IDataSource Source(string name, SourceResult result)
-    {
-        var source = Substitute.For<IDataSource>();
-        source.Name.Returns(name);
-        source.Categories.Returns([name]);
-        source.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns(result);
-        return source;
-    }
+    private static IDataSource Source(string name, SourceResult result) => TestSources.Returning(name, result);
 }

@@ -30,21 +30,41 @@ Minimal APIs, versioned in the URL. Each feature is one sealed `IEndpoint` class
 
 | Method and path | Purpose | Responses |
 |---|---|---|
-| `GET /api/v1/aggregation?page=1&pageSize=20` | Items from every source, merged and paged | 200, 400, 503 |
+| `GET /api/v1/aggregation` | Items from the selected sources, filtered, sorted and paged | 200, 400, 503 |
 | `GET /api/v1/sources` | Registered sources and their categories | 200 |
 | `GET /api/v1/statistics` | Request statistics per source | 200 |
 | `GET /health/live`, `GET /health/ready` | Liveness and readiness probes (`Healthy` / `Unhealthy`) | 200, 503 |
 | `GET /openapi/v1.json` | OpenAPI 3.2 document; Scalar UI at `/scalar` in Development | 200 |
 
-`page` must be at least 1; `pageSize` must be between 1 and 100 (default 20). An unknown version such as `/api/v2/…` is 404.
+An unknown version such as `/api/v2/…` is 404.
+
+### Aggregation query
+
+Every parameter is optional. Blank values count as missing, and names are matched ignoring case.
+
+| Parameter | Meaning | Rules |
+|---|---|---|
+| `q` | Search text, passed to news and repositories in place of their configured query | at most 200 characters |
+| `city` | Weather location; Open-Meteo looks it up with its keyless geocoding API, OpenWeatherMap takes it by name. An unknown city gives no weather items, not a failure | at most 100 characters |
+| `sources` | Comma-separated source names, e.g. `news,repositories`; other sources are not called | unknown name → 400 |
+| `category` | Keep only items of this category; sources that cannot serve it are not called | unknown, or not served by the selected sources → 400 |
+| `from`, `to` | Inclusive `publishedAt` range, ISO 8601; a value without an offset is read as UTC. Also passed to sources that can filter by date | `from` after `to` → 400 |
+| `sortBy` | `relevance` (default), `date` or `source` | other values → 400 |
+| `sortOrder` | `desc` (default) or `asc` | other values → 400 |
+| `page`, `pageSize` | Paging, applied after filtering and sorting | `page` ≥ 1; `pageSize` 1–100, default 20 |
+
+Ties are broken deterministically: by date for `relevance`, by relevance for `date` and `source`, then by `id`. Example: `GET /api/v1/aggregation?q=rust&sources=news,repositories&sortBy=date&from=2026-11-01T00:00:00Z`.
+
+**Relevance is a heuristic.** Each source scores its own items from 0 to 1, and the scores are not comparable across providers in any strict sense. News uses the upstream rank, repositories mix GitHub's search score with stars on a log scale, and weather favours readings closest to `from` (or now). Use it to order a mixed list, not as a measure of quality.
 
 ### Aggregation response
 
 ```json
 {
   "items": [
-    { "id": "news-1", "source": "news", "category": "news", "title": "…", "summary": "…",
-      "url": "https://…", "publishedAt": "2026-11-21T12:00:00+00:00" }
+    { "id": "news:4242", "source": "news", "category": "news", "title": "…", "summary": "…",
+      "url": "https://…", "publishedAt": "2026-11-21T12:00:00+00:00", "relevance": 0.95,
+      "details": { "$type": "news", "author": "dana", "points": 120, "publisher": null } }
   ],
   "sources": [
     { "name": "news",         "status": "Success",  "durationMs": 41.2, "error": null,           "ageSeconds": null },
@@ -55,11 +75,13 @@ Minimal APIs, versioned in the URL. Each feature is one sealed `IEndpoint` class
 }
 ```
 
+`details` carries the source-specific fields, and `$type` says which shape follows: `weather` (`location`, `minTemperature`, `maxTemperature` in °C, `conditions`), `news` (`author`, `points`, `publisher`) or `repository` (`stars`, `forks`, `language`).
+
 **A 200 can be degraded.** The status is 200 whenever at least one source produced data, live (`Success`), from cache (`Cached`) or as last-known-good data (`Fallback`, with its age). Read `sources[]` to see which sources failed. Only when every source fails, with no fallback, is the answer 503.
 
 ### Errors
 
-Every error is an RFC 9457 `application/problem+json` body with a `traceId` that matches the distributed trace. A 503 also carries `sources[]`. Validation errors (400) are keyed by the query parameter name (`pageSize`). A 500 never contains exception details.
+Every error is an RFC 9457 `application/problem+json` body with a `traceId` that matches the distributed trace. A 503 also carries `sources[]`. Validation errors (400) are keyed by the query parameter name (`pageSize`, `sources`, `category`, `from`, `sortBy`, …). A 500 never contains exception details.
 
 ### Contract tests
 

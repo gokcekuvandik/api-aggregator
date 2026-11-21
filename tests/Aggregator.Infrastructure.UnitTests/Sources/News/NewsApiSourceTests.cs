@@ -1,5 +1,7 @@
 using Aggregator.Application.Sources;
+using Aggregator.Domain.Items;
 using Aggregator.Infrastructure.Sources.News.NewsApi;
+using Aggregator.Infrastructure.Sources.Relevance;
 using Aggregator.Infrastructure.UnitTests.TestDoubles;
 using Microsoft.Extensions.Options;
 using RichardSzalay.MockHttp;
@@ -25,6 +27,45 @@ public sealed class NewsApiSourceTests : IDisposable
         await Source().FetchAsync(SourceTestHost.Query, TestContext.Current.CancellationToken);
 
         _host.Http.VerifyNoOutstandingExpectation();
+    }
+
+    [Fact]
+    public async Task FetchAsync_ShouldSortByRelevancy_WhenRequestHasText()
+    {
+        _host.Http.Expect("*").WithExactQueryString("q=rust%20lang&pageSize=20&sortBy=relevancy&language=en").Respond("application/json", """{"articles":[]}""");
+
+        await Source().FetchAsync(SourceTestHost.Query with { Text = "rust lang" }, TestContext.Current.CancellationToken);
+
+        _host.Http.VerifyNoOutstandingExpectation();
+    }
+
+    [Fact]
+    public async Task FetchAsync_ShouldPassDateRange_WhenRequestHasOne()
+    {
+        _host.Http.Expect("*")
+            .WithExactQueryString("q=dotnet&pageSize=20&sortBy=publishedAt&language=en&from=2026-11-20T10%3A00%3A00Z&to=2026-11-21T00%3A00%3A01Z")
+            .Respond("application/json", """{"articles":[]}""");
+        var query = SourceTestHost.Query with
+        {
+            From = new DateTimeOffset(2026, 11, 20, 12, 0, 0, TimeSpan.FromHours(2)),
+            To = new DateTimeOffset(2026, 11, 21, 0, 0, 0, 500, TimeSpan.Zero),
+        };
+
+        await Source().FetchAsync(query, TestContext.Current.CancellationToken);
+
+        _host.Http.VerifyNoOutstandingExpectation();
+    }
+
+    [Fact]
+    public async Task FetchAsync_ShouldMapDetailsAndRank_WhenArticlesArrive()
+    {
+        _host.Http.When("*").Respond("application/json", SourceTestHost.Fixture("newsapi-everything.json"));
+
+        var result = await Source().FetchAsync(SourceTestHost.Query, TestContext.Current.CancellationToken);
+
+        var items = result.ShouldBeOfType<SourceSuccess>().Items;
+        items[0].Details.ShouldBe(new NewsDetails(Author: "Dana", Points: null, Publisher: "Example Tech"));
+        items.Select(i => i.Relevance.Value).ShouldBe([1.0, 0.5]);
     }
 
     [Fact]
@@ -57,5 +98,5 @@ public sealed class NewsApiSourceTests : IDisposable
         new NewsApiOptions().BaseAddress.ShouldBe(new Uri("https://newsapi.org/"));
     }
 
-    private NewsApiSource Source() => new(_host.Fetcher, Options.Create(new NewsApiOptions { ApiKey = ApiKey }));
+    private NewsApiSource Source() => new(_host.Fetcher, Options.Create(new NewsApiOptions { ApiKey = ApiKey }), new RankRelevanceScorer());
 }

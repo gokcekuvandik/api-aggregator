@@ -165,7 +165,8 @@ public sealed class SourceFetcherTests : IDisposable
         _fetcher.FetchAsync(SourceName, new HttpRequestMessage(HttpMethod.Get, Path), TestPayloadJsonContext.Default.NamesPayload, map, cancellationToken);
 
     private static IReadOnlyList<AggregatedItem> ToItems(NamesPayload payload) =>
-        [.. payload.Names.Select(name => new AggregatedItem(name, SourceName, SourceName, name, null, null, DateTimeOffset.UnixEpoch))];
+        [.. payload.Names.Select(name => new AggregatedItem(
+            name, SourceName, SourceName, name, null, null, DateTimeOffset.UnixEpoch, RelevanceScore.None, new NewsDetails(null, null, null)))];
 }
 
 internal sealed record NamesPayload(IReadOnlyList<string> Names);

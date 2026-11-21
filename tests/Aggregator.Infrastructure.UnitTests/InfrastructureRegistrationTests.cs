@@ -92,6 +92,19 @@ public sealed class InfrastructureRegistrationTests
         exception.Message.ShouldNotContain(secret);
     }
 
+    [Theory]
+    [InlineData("http://geo.example/", "Sources:weather:GeocodingAddress must use https")]
+    [InlineData("https://geo.example/v1", "Sources:weather:GeocodingAddress must end with '/'")]
+    public async Task AddInfrastructure_ShouldFailAtStartup_WhenGeocodingAddressIsInvalid(string address, string expected)
+    {
+        using var provider = Build(new() { ["Sources:weather:GeocodingAddress"] = address });
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() =>
+            provider.GetRequiredService<IAsyncStartupValidator>().ValidateAsync(TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain(expected);
+    }
+
     private static ServiceProvider Build(Dictionary<string, string?> settings, Action<IServiceCollection>? configure = null)
     {
         var services = TestServices.Create(settings, out var configuration);

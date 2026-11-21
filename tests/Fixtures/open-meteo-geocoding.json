@@ -1,0 +1,14 @@
+{
+  "results": [
+    {
+      "id": 2988507,
+      "name": "Paris",
+      "latitude": 48.85341,
+      "longitude": 2.3488,
+      "country_code": "FR",
+      "timezone": "Europe/Paris",
+      "country": "France"
+    }
+  ],
+  "generationtime_ms": 0.42
+}

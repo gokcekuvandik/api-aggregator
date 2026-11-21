@@ -25,6 +25,7 @@ internal sealed class FakeSource(IHttpClientFactory httpClientFactory) : IDataSo
     {
         var titles = await httpClientFactory.CreateClient(Name).GetFromJsonAsync<string[]>(Path.TrimStart('/'), cancellationToken) ?? [];
         return new SourceSuccess([.. titles.Select((title, i) => new AggregatedItem(
-            $"{Name}:{i}", Name, Name, title, null, null, new DateTimeOffset(2026, 11, 21, 0, 0, 0, TimeSpan.Zero)))]);
+            $"{Name}:{i}", Name, Name, title, null, null, new DateTimeOffset(2026, 11, 21, 0, 0, 0, TimeSpan.Zero),
+            RelevanceScore.None, new NewsDetails(null, null, null)))]);
     }
 }

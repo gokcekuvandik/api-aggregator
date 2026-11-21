@@ -8,4 +8,6 @@ public sealed record AggregatedItem(
     string Title,
     string? Summary,
     Uri? Url,
-    DateTimeOffset PublishedAt);
+    DateTimeOffset PublishedAt,
+    RelevanceScore Relevance,
+    ItemDetails Details);

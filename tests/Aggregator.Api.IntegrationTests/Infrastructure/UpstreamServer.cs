@@ -12,6 +12,7 @@ public sealed class UpstreamServer : IDisposable
     public const string HackerNewsPath = "/api/v1/search";
     public const string NewsApiPath = "/v2/everything";
     public const string GitHubPath = "/search/repositories";
+    public const string GeocodingPath = "/v1/search";
 
     /// <summary>Mappings at this priority win over the defaults that <see cref="StubKeylessSources"/> adds.</summary>
     public const int OverridePriority = 1;
@@ -26,6 +27,7 @@ public sealed class UpstreamServer : IDisposable
     public Dictionary<string, string?> Settings() => new()
     {
         ["Sources:weather:BaseAddress"] = BaseAddress,
+        ["Sources:weather:GeocodingAddress"] = BaseAddress,
         ["Sources:news:BaseAddress"] = BaseAddress,
         ["Sources:repositories:BaseAddress"] = BaseAddress,
         ["Sources:weather:ApiKey"] = string.Empty,

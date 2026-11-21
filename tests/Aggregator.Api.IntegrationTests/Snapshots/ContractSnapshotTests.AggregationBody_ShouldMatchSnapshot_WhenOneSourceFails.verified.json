@@ -7,7 +7,14 @@
       "title": "news item 1",
       "summary": "summary",
       "url": "https://example.test/news/1",
-      "publishedAt": "2026-11-21T12:00:00+00:00"
+      "publishedAt": "2026-11-21T12:00:00+00:00",
+      "relevance": 0.5,
+      "details": {
+        "$type": "news",
+        "author": "alice",
+        "points": 10,
+        "publisher": null
+      }
     },
     {
       "id": "news-2",
@@ -16,7 +23,14 @@
       "title": "news item 2",
       "summary": "summary",
       "url": "https://example.test/news/2",
-      "publishedAt": "2026-11-21T12:00:00+00:00"
+      "publishedAt": "2026-11-21T12:00:00+00:00",
+      "relevance": 0.5,
+      "details": {
+        "$type": "news",
+        "author": "alice",
+        "points": 10,
+        "publisher": null
+      }
     }
   ],
   "sources": [

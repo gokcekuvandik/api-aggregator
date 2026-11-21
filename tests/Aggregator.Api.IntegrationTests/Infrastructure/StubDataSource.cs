@@ -31,7 +31,16 @@ internal sealed class StubDataSource(string name, SourceResult result) : IDataSo
             Title: $"{source} item {i}",
             Summary: "summary",
             Url: new Uri($"https://example.test/{source}/{i}"),
-            PublishedAt: new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero)))];
+            PublishedAt: new DateTimeOffset(2026, 11, 21, 12, 0, 0, TimeSpan.Zero),
+            Relevance: RelevanceScore.From(0.5),
+            Details: DetailsFor(source)))];
+
+    private static ItemDetails DetailsFor(string source) => source switch
+    {
+        "weather" => new WeatherDetails("Athens", 12, 19, "clear sky"),
+        "repositories" => new RepositoryDetails(Stars: 42, Forks: 7, Language: "C#"),
+        _ => new NewsDetails(Author: "alice", Points: 10, Publisher: null),
+    };
 }
 
 /// <summary>A source that throws, standing in for an unexpected bug.</summary>
