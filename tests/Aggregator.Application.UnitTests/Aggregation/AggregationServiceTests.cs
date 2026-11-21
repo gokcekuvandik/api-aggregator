@@ -13,10 +13,9 @@ public sealed class AggregationServiceTests
     [Fact]
     public async Task AggregateAsync_ShouldMergeItemsInSourceOrder_WhenSourcesReturnData()
     {
-        var service = new AggregationService([
+        var service = Service(
             Source("news", new SourceSuccess(TestItems.Many(2, "news"))),
-            Source("weather", new SourceFallback(TestItems.Many(1, "weather"), TimeSpan.FromMinutes(1))),
-        ]);
+            Source("weather", new SourceFallback(TestItems.Many(1, "weather"), TimeSpan.FromMinutes(1))));
 
         var result = await service.AggregateAsync(DefaultQuery, TestContext.Current.CancellationToken);
 
@@ -28,10 +27,9 @@ public sealed class AggregationServiceTests
     public async Task AggregateAsync_ShouldReportEverySource_WhenOneFails()
     {
         var failure = new SourceFailure("timeout");
-        var service = new AggregationService([
+        var service = Service(
             Source("news", new SourceSuccess(TestItems.Many(1, "news"))),
-            Source("weather", failure),
-        ]);
+            Source("weather", failure));
 
         var result = await service.AggregateAsync(DefaultQuery, TestContext.Current.CancellationToken);
 
@@ -44,7 +42,7 @@ public sealed class AggregationServiceTests
     [Fact]
     public async Task AggregateAsync_ShouldPageMergedItems_WhenQueryRequestsAPage()
     {
-        var service = new AggregationService([Source("news", new SourceSuccess(TestItems.Many(5, "news")))]);
+        var service = Service(Source("news", new SourceSuccess(TestItems.Many(5, "news"))));
 
         var result = await service.AggregateAsync(new AggregationQuery(Page: 2, PageSize: 2), TestContext.Current.CancellationToken);
 
@@ -59,7 +57,7 @@ public sealed class AggregationServiceTests
         using var cts = new CancellationTokenSource();
         var query = new AggregationQuery(Page: 1, PageSize: 5);
 
-        await new AggregationService([source]).AggregateAsync(query, cts.Token);
+        await Service(source).AggregateAsync(query, cts.Token);
 
         await source.Received(1).FetchAsync(query, cts.Token);
     }
@@ -73,13 +71,15 @@ public sealed class AggregationServiceTests
         first.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns(slow.Task);
         var second = Source("fast", new SourceSuccess([]));
 
-        var pending = new AggregationService([first, second]).AggregateAsync(DefaultQuery, TestContext.Current.CancellationToken);
+        var pending = Service(first, second).AggregateAsync(DefaultQuery, TestContext.Current.CancellationToken);
 
         await second.Received(1).FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>());
         pending.IsCompleted.ShouldBeFalse();
         slow.SetResult(new SourceSuccess([]));
         (await pending).Sources.Count.ShouldBe(2);
     }
+
+    private static AggregationService Service(params IDataSource[] sources) => new(new DataSourceRegistry(sources));
 
     private static IDataSource Source(string name, SourceResult result)
     {

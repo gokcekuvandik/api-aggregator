@@ -1,0 +1,102 @@
+using System.Net;
+using System.Net.Http.Headers;
+using Aggregator.Application.Sources;
+using Aggregator.Infrastructure.Sources.News.HackerNews;
+using Aggregator.Infrastructure.Sources.News.NewsApi;
+using Aggregator.Infrastructure.Sources.Repositories.GitHub;
+using Aggregator.Infrastructure.Sources.Weather.OpenMeteo;
+using Aggregator.Infrastructure.Sources.Weather.OpenWeatherMap;
+using Aggregator.Infrastructure.UnitTests.TestDoubles;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using RichardSzalay.MockHttp;
+
+namespace Aggregator.Infrastructure.UnitTests;
+
+public sealed class InfrastructureRegistrationTests
+{
+    [Fact]
+    public void AddInfrastructure_ShouldRegisterKeylessProviders_WhenNoKeyIsConfigured()
+    {
+        using var provider = Build([]);
+
+        provider.GetServices<IDataSource>().Select(s => s.GetType())
+            .ShouldBe([typeof(OpenMeteoSource), typeof(HackerNewsSource), typeof(GitHubSource)]);
+    }
+
+    [Fact]
+    public void AddInfrastructure_ShouldRegisterKeyedProviders_WhenKeysAreConfigured()
+    {
+        using var provider = Build(new() { ["Sources:weather:ApiKey"] = "w", ["Sources:news:ApiKey"] = "n" });
+
+        provider.GetServices<IDataSource>().Select(s => s.GetType())
+            .ShouldBe([typeof(OpenWeatherMapSource), typeof(NewsApiSource), typeof(GitHubSource)]);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AddInfrastructure_ShouldKeepKeylessProvider_WhenKeyIsBlank(string key)
+    {
+        using var provider = Build(new() { ["Sources:weather:ApiKey"] = key });
+
+        provider.GetServices<IDataSource>().First().ShouldBeOfType<OpenMeteoSource>();
+    }
+
+    [Fact]
+    public void AddInfrastructure_ShouldNameEverySourceUniquely_WhenRegistered()
+    {
+        using var provider = Build([]);
+
+        new DataSourceRegistry(provider.GetServices<IDataSource>()).All.Select(s => s.Name)
+            .ShouldBe(["weather", "news", "repositories"]);
+    }
+
+    [Fact]
+    public async Task AddInfrastructure_ShouldReuseRepositoriesPayload_WhenGitHubAnswersNotModified()
+    {
+        using var http = new MockHttpMessageHandler();
+        http.Expect("*").Respond(_ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(SourceTestHost.Fixture("github-search.json"), MediaTypeHeaderValue.Parse("application/json")),
+            };
+            response.Headers.ETag = EntityTagHeaderValue.Parse("\"v1\"");
+            return response;
+        });
+        http.Expect("*").WithHeaders("If-None-Match", "\"v1\"").Respond(HttpStatusCode.NotModified);
+        using var provider = Build([], services => services.AddHttpClient("repositories").ConfigurePrimaryHttpMessageHandler(() => http));
+        var source = provider.GetServices<IDataSource>().Single(s => s.Name == "repositories");
+
+        var first = await source.FetchAsync(SourceTestHost.Query, TestContext.Current.CancellationToken);
+        var second = await source.FetchAsync(SourceTestHost.Query, TestContext.Current.CancellationToken);
+
+        http.VerifyNoOutstandingExpectation();
+        second.ShouldBeOfType<SourceSuccess>().Items.ShouldBe(first.ShouldBeOfType<SourceSuccess>().Items);
+    }
+
+    [Theory]
+    [InlineData("Sources:news:ApiKey", "bad key")]
+    [InlineData("Sources:weather:ApiKey", "line\nbreak")]
+    [InlineData("Sources:repositories:Token", "tab\tinside")]
+    public async Task AddInfrastructure_ShouldFailAtStartup_WhenSecretIsNotHeaderSafe(string setting, string secret)
+    {
+        using var provider = Build(new() { [setting] = secret });
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() =>
+            provider.GetRequiredService<IAsyncStartupValidator>().ValidateAsync(TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain(setting.Split(':')[^1]);
+        exception.Message.ShouldNotContain(secret);
+    }
+
+    private static ServiceProvider Build(Dictionary<string, string?> settings, Action<IServiceCollection>? configure = null)
+    {
+        var services = TestServices.Create(settings, out var configuration);
+        services.AddInfrastructure(configuration);
+        configure?.Invoke(services);
+        return services.BuildServiceProvider();
+    }
+}

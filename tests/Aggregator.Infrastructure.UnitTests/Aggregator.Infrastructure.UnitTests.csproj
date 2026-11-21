@@ -2,10 +2,16 @@
 
   <ItemGroup>
     <PackageReference Include="NSubstitute" />
+    <PackageReference Include="RichardSzalay.MockHttp" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Aggregator.Infrastructure\Aggregator.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Fixtures\*.json" LinkBase="Fixtures" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

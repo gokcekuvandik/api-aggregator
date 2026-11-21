@@ -5,15 +5,13 @@ using Aggregator.Application.Sources;
 namespace Aggregator.Application.Aggregation;
 
 /// <summary>Queries every source concurrently, merges their items and pages the result.</summary>
-public sealed class AggregationService(IEnumerable<IDataSource> sources)
+public sealed class AggregationService(DataSourceRegistry registry)
 {
-    private readonly IReadOnlyList<IDataSource> _sources = [.. sources];
-
     public async Task<AggregationResult> AggregateAsync(AggregationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var reports = await Task.WhenAll(_sources.Select(source => FetchAsync(source, query, cancellationToken)));
+        var reports = await Task.WhenAll(registry.All.Select(source => FetchAsync(source, query, cancellationToken)));
         var merged = reports.SelectMany(report => report.Result.Items).ToList();
 
         return new AggregationResult(PageRequest.Apply(merged, query.Page, query.PageSize), reports);

@@ -1,0 +1,33 @@
+{
+  "status": "ok",
+  "totalResults": 3,
+  "articles": [
+    {
+      "source": { "id": null, "name": "Example Tech" },
+      "author": "Dana",
+      "title": ".NET 11 ships",
+      "description": "The release brings faster startup.",
+      "url": "https://example.com/net11",
+      "urlToImage": null,
+      "publishedAt": "2026-11-20T10:00:00Z",
+      "content": "Full text…"
+    },
+    {
+      "source": { "id": null, "name": "[Removed]" },
+      "author": null,
+      "title": "[Removed]",
+      "description": "[Removed]",
+      "url": "https://removed.com",
+      "urlToImage": null,
+      "publishedAt": "2026-11-19T00:00:00Z",
+      "content": "[Removed]"
+    },
+    {
+      "source": { "id": null, "name": "Unsafe" },
+      "title": "Link with a script scheme",
+      "description": null,
+      "url": "javascript:alert(1)",
+      "publishedAt": "2026-11-18T00:00:00Z"
+    }
+  ]
+}
