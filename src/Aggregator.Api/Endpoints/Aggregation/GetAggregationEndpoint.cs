@@ -20,11 +20,11 @@ public sealed class GetAggregationEndpoint : IEndpoint
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
     private static async Task<Results<Ok<AggregationResponse>, ProblemHttpResult>> HandleAsync(
-        [AsParameters] AggregationQuery query,
+        [AsParameters] AggregationRequest request,
         AggregationService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.AggregateAsync(query, cancellationToken);
+        var result = await service.AggregateAsync(request.ToQuery(), cancellationToken);
         IReadOnlyList<SourceStatusResponse> sources = [.. result.Sources.Select(SourceStatusResponse.From)];
 
         if (!result.HasData)

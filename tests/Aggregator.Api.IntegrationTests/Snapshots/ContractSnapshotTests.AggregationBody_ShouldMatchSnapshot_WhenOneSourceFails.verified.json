@@ -1,0 +1,50 @@
+{
+  "items": [
+    {
+      "id": "news-1",
+      "source": "news",
+      "category": "news",
+      "title": "news item 1",
+      "summary": "summary",
+      "url": "https://example.test/news/1",
+      "publishedAt": "2026-11-21T12:00:00+00:00"
+    },
+    {
+      "id": "news-2",
+      "source": "news",
+      "category": "news",
+      "title": "news item 2",
+      "summary": "summary",
+      "url": "https://example.test/news/2",
+      "publishedAt": "2026-11-21T12:00:00+00:00"
+    }
+  ],
+  "sources": [
+    {
+      "name": "news",
+      "status": "Success",
+      "durationMs": "{scrubbed}",
+      "error": null,
+      "ageSeconds": null
+    },
+    {
+      "name": "weather",
+      "status": "Fallback",
+      "durationMs": "{scrubbed}",
+      "error": null,
+      "ageSeconds": 90
+    },
+    {
+      "name": "repositories",
+      "status": "Failed",
+      "durationMs": "{scrubbed}",
+      "error": "repositories is unavailable",
+      "ageSeconds": null
+    }
+  ],
+  "paging": {
+    "page": 1,
+    "pageSize": 2,
+    "totalCount": 3
+  }
+}

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+using Aggregator.Api.Http;
 using Asp.Versioning;
 
 namespace Aggregator.Api;
@@ -8,10 +10,13 @@ internal static class ApiServiceCollectionExtensions
     public static IServiceCollection AddApi(this IServiceCollection services)
     {
         // RFC 9457 bodies everywhere. The default writer adds "traceId".
-        services.AddProblemDetails();
+        services.AddProblemDetails(options => options.CustomizeProblemDetails = ValidationErrorKeys.CamelCase);
 
         // Validates [AsParameters] / body types before the handler runs; failures are 400 ProblemDetails.
         services.AddValidation();
+
+        // Numbers are numbers: no "123"-as-string in bodies, and OpenAPI types them as plain integers.
+        services.ConfigureHttpJsonOptions(options => options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict);
 
         services.AddApiVersioning(options =>
             {

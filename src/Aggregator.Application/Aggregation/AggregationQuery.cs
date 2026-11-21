@@ -1,12 +1,9 @@
-using System.ComponentModel.DataAnnotations;
 using Aggregator.Application.Paging;
 
 namespace Aggregator.Application.Aggregation;
 
 /// <summary>
-/// Query for <c>GET /api/v1/aggregation</c>, bound with <c>[AsParameters]</c> and checked by
-/// the built-in validation filter. ADR-0005 adds the filter and sort parameters.
+/// What to aggregate. HTTP binding and validation live in the Api's <c>AggregationRequest</c>;
+/// <see cref="PageRequest.Apply{T}"/> still guards the paging range. ADR-0005 adds filters and sorting.
 /// </summary>
-public sealed record AggregationQuery(
-    [property: Range(1, int.MaxValue)] int Page = 1,
-    [property: Range(1, PageRequest.MaxPageSize)] int PageSize = PageRequest.DefaultPageSize);
+public sealed record AggregationQuery(int Page = 1, int PageSize = PageRequest.DefaultPageSize);
