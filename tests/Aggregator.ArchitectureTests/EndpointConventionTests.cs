@@ -30,9 +30,7 @@ public sealed class EndpointConventionTests
 
     [Fact]
     public void EndpointScan_ShouldFindEveryFeature_WhenAssemblyIsLoaded() =>
-        ApiAssembly.GetTypes()
-            .Where(type => type is { IsClass: true, IsAbstract: false } && type.IsAssignableTo(typeof(IEndpoint)))
-            .Select(type => type.Name)
-            .Order(StringComparer.Ordinal)
+        EndpointRegistration.DiscoverEndpoints()
+            .Select(endpoint => endpoint.GetType().Name)
             .ShouldBe(["GetAggregationEndpoint", "GetSourcesEndpoint", "GetStatisticsEndpoint"]);
 }

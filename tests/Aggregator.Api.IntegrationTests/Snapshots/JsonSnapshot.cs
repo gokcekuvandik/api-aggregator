@@ -16,15 +16,11 @@ namespace Aggregator.Api.IntegrationTests.Snapshots;
 /// </summary>
 internal static class JsonSnapshot
 {
-    public const string ScrubbedValue = "{scrubbed}";
-    public const string UpdateVariable = "AGGREGATOR_UPDATE_SNAPSHOTS";
+    private const string ScrubbedValue = "{scrubbed}";
+    private const string UpdateVariable = "AGGREGATOR_UPDATE_SNAPSHOTS";
 
     /// <summary>Members whose values change on every run; the snapshot pins only their presence.</summary>
-    public static readonly IReadOnlySet<string> VolatileMembers = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "traceId",
-        "durationMs",
-    };
+    private static readonly HashSet<string> VolatileMembers = new(StringComparer.Ordinal) { "traceId", "durationMs" };
 
     // Relaxed escaping keeps snapshots readable ("+00:00", "application/problem+json").
     // The files are only ever read by people and by this helper, never embedded in HTML.
@@ -60,21 +56,20 @@ internal static class JsonSnapshot
             return;
         }
 
-        if (File.Exists(verifiedPath))
+        var verified = File.Exists(verifiedPath)
+            ? NormalizeNewLines(await File.ReadAllTextAsync(verifiedPath, cancellationToken))
+            : null;
+        if (verified == actual)
         {
-            var verified = NormalizeNewLines(await File.ReadAllTextAsync(verifiedPath, cancellationToken));
-            if (verified == actual)
-            {
-                File.Delete(receivedPath);
-                return;
-            }
-
-            await File.WriteAllTextAsync(receivedPath, actual, cancellationToken);
-            Assert.Fail($"Snapshot mismatch for {name}. {FirstDifference(verified, actual)}\nReview {receivedPath} and rename it to .verified.json to accept.");
+            File.Delete(receivedPath);
+            return;
         }
 
         await File.WriteAllTextAsync(receivedPath, actual, cancellationToken);
-        Assert.Fail($"No snapshot for {name}. Review {receivedPath} and rename it to .verified.json to accept.");
+        var problem = verified is null
+            ? $"No snapshot for {name}."
+            : $"Snapshot mismatch for {name}. {FirstDifference(verified, actual)}";
+        Assert.Fail($"{problem}\nReview {receivedPath} and rename it to .verified.json to accept.");
     }
 
     /// <summary>Indented JSON with LF line endings and volatile member values replaced.</summary>
@@ -87,29 +82,36 @@ internal static class JsonSnapshot
 
     private static void Scrub(JsonNode node)
     {
-        switch (node)
+        if (node is JsonArray array)
         {
-            case JsonObject obj:
-                foreach (var key in obj.Select(p => p.Key).ToList())
-                {
-                    if (VolatileMembers.Contains(key) && obj[key] is not null)
-                    {
-                        obj[key] = ScrubbedValue;
-                    }
-                    else if (obj[key] is { } child)
-                    {
-                        Scrub(child);
-                    }
-                }
+            foreach (var item in array.OfType<JsonNode>())
+            {
+                Scrub(item);
+            }
 
-                break;
-            case JsonArray array:
-                foreach (var item in array.OfType<JsonNode>())
-                {
-                    Scrub(item);
-                }
+            return;
+        }
 
-                break;
+        if (node is not JsonObject obj)
+        {
+            return;
+        }
+
+        foreach (var (key, child) in obj.ToList())
+        {
+            if (child is null)
+            {
+                continue;
+            }
+
+            if (VolatileMembers.Contains(key))
+            {
+                obj[key] = ScrubbedValue;
+            }
+            else
+            {
+                Scrub(child);
+            }
         }
     }
 
@@ -119,8 +121,12 @@ internal static class JsonSnapshot
     {
         var expectedLines = expected.Split('\n');
         var actualLines = actual.Split('\n');
-        var line = Enumerable.Range(0, Math.Min(expectedLines.Length, actualLines.Length))
-            .FirstOrDefault(i => expectedLines[i] != actualLines[i], Math.Min(expectedLines.Length, actualLines.Length));
+        var line = 0;
+        while (line < expectedLines.Length && line < actualLines.Length && expectedLines[line] == actualLines[line])
+        {
+            line++;
+        }
+
         var verified = line < expectedLines.Length ? expectedLines[line] : "<end of file>";
         var received = line < actualLines.Length ? actualLines[line] : "<end of file>";
         return $"First difference at line {line + 1}:\n  verified: {verified}\n  received: {received}";

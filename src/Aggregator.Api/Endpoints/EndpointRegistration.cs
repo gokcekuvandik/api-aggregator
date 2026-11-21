@@ -17,9 +17,10 @@ internal static class EndpointRegistration
         return app;
     }
 
-    private static IEnumerable<IEndpoint> DiscoverEndpoints() =>
-        typeof(IEndpoint).Assembly.GetTypes()
+    /// <summary>Every concrete <see cref="IEndpoint"/> in this assembly, in a stable order.</summary>
+    internal static IReadOnlyList<IEndpoint> DiscoverEndpoints() =>
+        [.. typeof(IEndpoint).Assembly.GetTypes()
             .Where(type => type is { IsClass: true, IsAbstract: false } && type.IsAssignableTo(typeof(IEndpoint)))
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
-            .Select(type => (IEndpoint)Activator.CreateInstance(type)!);
+            .Select(type => (IEndpoint)Activator.CreateInstance(type)!)];
 }

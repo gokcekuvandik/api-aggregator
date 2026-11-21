@@ -23,7 +23,7 @@ internal sealed class StubDataSource(string name, SourceResult result) : IDataSo
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown source state."),
     });
 
-    public static IReadOnlyList<AggregatedItem> Items(string source, int count) =>
+    private static IReadOnlyList<AggregatedItem> Items(string source, int count) =>
         [.. Enumerable.Range(1, count).Select(i => new AggregatedItem(
             Id: $"{source}-{i}",
             Source: source,

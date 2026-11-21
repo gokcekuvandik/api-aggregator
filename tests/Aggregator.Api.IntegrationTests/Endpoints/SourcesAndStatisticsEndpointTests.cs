@@ -13,7 +13,7 @@ public sealed class SourcesAndStatisticsEndpointTests(AggregatorApiFactory facto
             StubDataSource.InState("news", "Success"),
             StubDataSource.InState("weather", "Success"));
 
-        using var response = await client.GetAsync("/api/v1/sources", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync(ApiRoutes.Sources, TestContext.Current.CancellationToken);
 
         var items = (await response.ShouldBeJson(HttpStatusCode.OK)).GetProperty("items").EnumerateArray().ToList();
         items.Select(i => i.GetProperty("name").GetString()).ShouldBe(["news", "weather"]);
@@ -27,7 +27,7 @@ public sealed class SourcesAndStatisticsEndpointTests(AggregatorApiFactory facto
             Source: "news", TotalRequests: 4, AverageDuration: TimeSpan.FromMilliseconds(125), CacheHits: 2, Failures: 1));
         using var client = factory.CreateClientWith(reader);
 
-        using var response = await client.GetAsync("/api/v1/statistics", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync(ApiRoutes.Statistics, TestContext.Current.CancellationToken);
 
         var item = (await response.ShouldBeJson(HttpStatusCode.OK)).GetProperty("items")[0];
         item.GetProperty("source").GetString().ShouldBe("news");
@@ -42,7 +42,7 @@ public sealed class SourcesAndStatisticsEndpointTests(AggregatorApiFactory facto
     {
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/api/v1/statistics", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync(ApiRoutes.Statistics, TestContext.Current.CancellationToken);
 
         (await response.ShouldBeJson(HttpStatusCode.OK)).GetProperty("items").GetArrayLength().ShouldBe(0);
     }

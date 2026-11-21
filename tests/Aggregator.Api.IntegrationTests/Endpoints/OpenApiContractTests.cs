@@ -12,7 +12,7 @@ public sealed class OpenApiContractTests(AggregatorApiFactory factory) : IClassF
     {
         var document = await GetDocumentAsync();
 
-        var parameters = document.GetProperty("paths").GetProperty("/api/v1/aggregation").GetProperty("get").GetProperty("parameters");
+        var parameters = document.GetProperty("paths").GetProperty(ApiRoutes.Aggregation).GetProperty("get").GetProperty("parameters");
 
         parameters.EnumerateArray().Select(p => p.GetProperty("name").GetString()).ShouldBe(["page", "pageSize"]);
     }
@@ -33,7 +33,7 @@ public sealed class OpenApiContractTests(AggregatorApiFactory factory) : IClassF
     {
         using var client = factory.CreateClientWith(StubDataSource.InState("news", "Success"));
 
-        using var response = await client.GetAsync("/api/v1/aggregation?pageSize=101", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync($"{ApiRoutes.Aggregation}?pageSize=101", TestContext.Current.CancellationToken);
 
         var problem = await response.ShouldBeProblem(HttpStatusCode.BadRequest);
         problem.GetProperty("errors").EnumerateObject().Select(e => e.Name).ShouldBe(["pageSize"]);
@@ -42,6 +42,6 @@ public sealed class OpenApiContractTests(AggregatorApiFactory factory) : IClassF
     private async Task<JsonElement> GetDocumentAsync()
     {
         using var client = factory.CreateClient();
-        return JsonElement.Parse(await client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken));
+        return JsonElement.Parse(await client.GetStringAsync(ApiRoutes.OpenApiDocument, TestContext.Current.CancellationToken));
     }
 }

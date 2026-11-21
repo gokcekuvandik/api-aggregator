@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace Aggregator.Api.IntegrationTests.Infrastructure;
 
@@ -12,19 +13,17 @@ namespace Aggregator.Api.IntegrationTests.Infrastructure;
 public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
 {
     public HttpClient CreateClientWith(params IDataSource[] sources) =>
-        Configure(services => ReplaceSources(services, sources)).CreateClient();
+        Create(services => ReplaceSources(services, sources));
 
     public HttpClient CreateClientWith(IStatisticsReader statistics) =>
-        Configure(services => services.Replace(ServiceDescriptor.Singleton(statistics))).CreateClient();
+        Create(services => services.Replace(ServiceDescriptor.Singleton(statistics)));
 
     public HttpClient CreateProductionClientWith(params IDataSource[] sources) =>
-        WithWebHostBuilder(builder => builder
-                .UseEnvironment("Production")
-                .ConfigureTestServices(services => ReplaceSources(services, sources)))
-            .CreateClient();
+        Create(services => ReplaceSources(services, sources), Environments.Production);
 
-    private WebApplicationFactory<Program> Configure(Action<IServiceCollection> configure) =>
-        WithWebHostBuilder(builder => builder.ConfigureTestServices(configure));
+    private HttpClient Create(Action<IServiceCollection> configure, string environment = "Development") =>
+        WithWebHostBuilder(builder => builder.UseEnvironment(environment).ConfigureTestServices(configure))
+            .CreateClient();
 
     private static void ReplaceSources(IServiceCollection services, IDataSource[] sources)
     {

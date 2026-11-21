@@ -1,4 +1,5 @@
 using Aggregator.Application.Aggregation;
+using Aggregator.Application.Paging;
 using Aggregator.Application.Sources;
 using Aggregator.Application.UnitTests.TestData;
 using NSubstitute;
@@ -7,14 +8,14 @@ namespace Aggregator.Application.UnitTests.Aggregation;
 
 public sealed class AggregationServiceTests
 {
-    private static readonly AggregationQuery DefaultQuery = new();
+    private static readonly AggregationQuery DefaultQuery = new(Page: 1, PageSize: PageRequest.DefaultPageSize);
 
     [Fact]
     public async Task AggregateAsync_ShouldMergeItemsInSourceOrder_WhenSourcesReturnData()
     {
         var service = new AggregationService([
-            Source("news", new SourceSuccess(ItemBuilder.Many(2, "news"))),
-            Source("weather", new SourceFallback(ItemBuilder.Many(1, "weather"), TimeSpan.FromMinutes(1))),
+            Source("news", new SourceSuccess(TestItems.Many(2, "news"))),
+            Source("weather", new SourceFallback(TestItems.Many(1, "weather"), TimeSpan.FromMinutes(1))),
         ]);
 
         var result = await service.AggregateAsync(DefaultQuery, TestContext.Current.CancellationToken);
@@ -28,7 +29,7 @@ public sealed class AggregationServiceTests
     {
         var failure = new SourceFailure("timeout");
         var service = new AggregationService([
-            Source("news", new SourceSuccess(ItemBuilder.Many(1, "news"))),
+            Source("news", new SourceSuccess(TestItems.Many(1, "news"))),
             Source("weather", failure),
         ]);
 
@@ -43,7 +44,7 @@ public sealed class AggregationServiceTests
     [Fact]
     public async Task AggregateAsync_ShouldPageMergedItems_WhenQueryRequestsAPage()
     {
-        var service = new AggregationService([Source("news", new SourceSuccess(ItemBuilder.Many(5, "news")))]);
+        var service = new AggregationService([Source("news", new SourceSuccess(TestItems.Many(5, "news")))]);
 
         var result = await service.AggregateAsync(new AggregationQuery(Page: 2, PageSize: 2), TestContext.Current.CancellationToken);
 

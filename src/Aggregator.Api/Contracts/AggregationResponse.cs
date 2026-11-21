@@ -51,15 +51,17 @@ public sealed record SourceStatusResponse(
     public static SourceStatusResponse From(SourceReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
-        var durationMs = report.Duration.TotalMilliseconds;
         return report.Result switch
         {
-            SourceSuccess => new(report.Name, SourceStatus.Success, durationMs, null, null),
-            SourceCached => new(report.Name, SourceStatus.Cached, durationMs, null, null),
-            SourceFallback fallback => new(report.Name, SourceStatus.Fallback, durationMs, null, fallback.Age.TotalSeconds),
-            SourceFailure failure => new(report.Name, SourceStatus.Failed, durationMs, failure.Error, null),
+            SourceSuccess => Status(SourceStatus.Success),
+            SourceCached => Status(SourceStatus.Cached),
+            SourceFallback fallback => Status(SourceStatus.Fallback, ageSeconds: fallback.Age.TotalSeconds),
+            SourceFailure failure => Status(SourceStatus.Failed, error: failure.Error),
             _ => throw new UnreachableException($"Unknown source result {report.Result.GetType().Name}."),
         };
+
+        SourceStatusResponse Status(SourceStatus status, string? error = null, double? ageSeconds = null) =>
+            new(report.Name, status, report.Duration.TotalMilliseconds, error, ageSeconds);
     }
 }
 

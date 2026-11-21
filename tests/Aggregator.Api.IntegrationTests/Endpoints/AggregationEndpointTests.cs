@@ -8,7 +8,7 @@ namespace Aggregator.Api.IntegrationTests.Endpoints;
 /// <summary>ADR-0002: <c>GET /api/v1/aggregation</c> contract and status codes.</summary>
 public sealed class AggregationEndpointTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
-    private const string Url = "/api/v1/aggregation";
+    private const string Url = ApiRoutes.Aggregation;
 
     /// <summary>ADR-0014 decision table: source states → HTTP status.</summary>
     public static TheoryData<string[], HttpStatusCode> DecisionTable => new()

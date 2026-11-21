@@ -12,5 +12,5 @@ public sealed class GetSourcesEndpoint : IEndpoint
             .WithSummary("The registered data sources and their categories");
 
     private static Ok<SourcesResponse> Handle(IEnumerable<IDataSource> sources) =>
-        TypedResults.Ok(new SourcesResponse([.. sources.Select(s => new SourceInfoResponse(s.Name, s.Categories))]));
+        TypedResults.Ok(new SourcesResponse([.. sources.Select(SourceInfoResponse.From)]));
 }

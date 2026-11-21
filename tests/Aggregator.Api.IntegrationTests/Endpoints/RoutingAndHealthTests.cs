@@ -11,7 +11,7 @@ public sealed class RoutingAndHealthTests(AggregatorApiFactory factory) : IClass
     {
         using var client = factory.CreateClient();
 
-        using var response = await client.GetAsync("/api/v1/sources", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync(ApiRoutes.Sources, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         response.Headers.GetValues("api-supported-versions").ShouldContain("1.0");

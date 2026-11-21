@@ -13,7 +13,7 @@ public sealed class ContractSnapshotTests(AggregatorApiFactory factory) : IClass
     {
         using var client = factory.CreateClient();
 
-        var json = await client.GetStringAsync("/openapi/v1.json", TestContext.Current.CancellationToken);
+        var json = await client.GetStringAsync(ApiRoutes.OpenApiDocument, TestContext.Current.CancellationToken);
 
         await JsonSnapshot.MatchAsync(json);
     }
@@ -26,7 +26,7 @@ public sealed class ContractSnapshotTests(AggregatorApiFactory factory) : IClass
             StubDataSource.InState("weather", "Fallback"),
             StubDataSource.InState("repositories", "Failed"));
 
-        var json = await client.GetStringAsync("/api/v1/aggregation?pageSize=2", TestContext.Current.CancellationToken);
+        var json = await client.GetStringAsync($"{ApiRoutes.Aggregation}?pageSize=2", TestContext.Current.CancellationToken);
 
         await JsonSnapshot.MatchAsync(json);
     }
@@ -36,7 +36,7 @@ public sealed class ContractSnapshotTests(AggregatorApiFactory factory) : IClass
     {
         using var client = factory.CreateClientWith(StubDataSource.InState("news", "Failed"));
 
-        using var response = await client.GetAsync("/api/v1/aggregation", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync(ApiRoutes.Aggregation, TestContext.Current.CancellationToken);
 
         await JsonSnapshot.MatchAsync(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
@@ -46,7 +46,7 @@ public sealed class ContractSnapshotTests(AggregatorApiFactory factory) : IClass
     {
         using var client = factory.CreateClientWith(StubDataSource.InState("news", "Success"));
 
-        using var response = await client.GetAsync("/api/v1/aggregation?pageSize=101", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync($"{ApiRoutes.Aggregation}?pageSize=101", TestContext.Current.CancellationToken);
 
         await JsonSnapshot.MatchAsync(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
