@@ -5,7 +5,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
-    <!-- ADR-0014 test naming is Method_Should_Expected_When, which needs underscores. -->
+    <!-- Test names use Method_Should_Expected_When, which needs underscores. -->
     <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 

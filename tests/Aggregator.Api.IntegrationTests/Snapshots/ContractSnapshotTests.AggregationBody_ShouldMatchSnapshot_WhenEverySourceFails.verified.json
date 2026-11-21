@@ -1,0 +1,16 @@
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.6.4",
+  "title": "No source returned data",
+  "status": 503,
+  "detail": "Every source failed and no fallback data was available. See sources for details.",
+  "sources": [
+    {
+      "name": "news",
+      "status": "Failed",
+      "durationMs": "{scrubbed}",
+      "error": "news is unavailable",
+      "ageSeconds": null
+    }
+  ],
+  "traceId": "{scrubbed}"
+}

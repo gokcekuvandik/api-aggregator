@@ -488,3 +488,6 @@ $RECYCLE.BIN/
 
 # dotnet test (Microsoft.Testing.Platform) output
 TestResults/
+
+# JSON snapshot tests: review, then rename to .verified.json
+*.received.json

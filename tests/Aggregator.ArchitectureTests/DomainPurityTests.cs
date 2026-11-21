@@ -5,9 +5,8 @@ using Assembly = System.Reflection.Assembly;
 namespace Aggregator.ArchitectureTests;
 
 /// <summary>
-/// ADR-0001: the Domain project depends on the shared framework only. An assembly name is not
-/// proof (NuGet packages such as System.Reactive start with "System."), so each reference is
-/// resolved and must load from the runtime directory.
+/// The Domain project may reference only the shared framework.
+/// Each reference must load from the runtime directory, because a "System." name alone is no proof.
 /// </summary>
 public sealed class DomainPurityTests
 {

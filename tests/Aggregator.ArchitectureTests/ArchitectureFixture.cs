@@ -1,5 +1,5 @@
 using Aggregator.Application;
-using Aggregator.Domain;
+using Aggregator.Domain.Items;
 using Aggregator.Infrastructure;
 using ArchUnitNET.Domain;
 using ArchUnitNET.Loader;
@@ -10,9 +10,9 @@ namespace Aggregator.ArchitectureTests;
 /// <summary>Loads the production assemblies once for every architecture rule.</summary>
 internal static class ArchitectureFixture
 {
-    public static readonly Assembly DomainAssembly = typeof(DomainAssemblyMarker).Assembly;
-    public static readonly Assembly ApplicationAssembly = typeof(ApplicationAssemblyMarker).Assembly;
-    public static readonly Assembly InfrastructureAssembly = typeof(InfrastructureAssemblyMarker).Assembly;
+    public static readonly Assembly DomainAssembly = typeof(AggregatedItem).Assembly;
+    public static readonly Assembly ApplicationAssembly = typeof(ApplicationServiceCollectionExtensions).Assembly;
+    public static readonly Assembly InfrastructureAssembly = typeof(InfrastructureServiceCollectionExtensions).Assembly;
     public static readonly Assembly ApiAssembly = typeof(Program).Assembly;
 
     public static readonly Architecture Architecture =
