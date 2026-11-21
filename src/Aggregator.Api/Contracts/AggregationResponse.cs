@@ -54,13 +54,18 @@ public sealed record ItemResponse(
 
 public sealed record PagingResponse(int Page, int PageSize, int TotalCount);
 
-/// <summary>How one source fared. A 200 can still contain <see cref="SourceStatus.Failed"/> entries.</summary>
+/// <summary>
+/// How one source fared. A 200 can still contain <see cref="SourceStatus.Failed"/> entries.
+/// A <see cref="SourceStatus.Fallback"/> names the secondary <c>provider</c> that answered live (age 0),
+/// or has no provider when the items are last-known-good data of the given age.
+/// </summary>
 public sealed record SourceStatusResponse(
     string Name,
     SourceStatus Status,
     double DurationMs,
     string? Error,
-    double? AgeSeconds)
+    double? AgeSeconds,
+    string? Provider)
 {
     public static SourceStatusResponse From(SourceReport report)
     {
@@ -69,13 +74,13 @@ public sealed record SourceStatusResponse(
         {
             SourceSuccess => Status(SourceStatus.Success),
             SourceCached => Status(SourceStatus.Cached),
-            SourceFallback fallback => Status(SourceStatus.Fallback, ageSeconds: fallback.Age.TotalSeconds),
+            SourceFallback fallback => Status(SourceStatus.Fallback, ageSeconds: fallback.Age.TotalSeconds, provider: fallback.Provider),
             SourceFailure failure => Status(SourceStatus.Failed, error: failure.Error),
             _ => throw new UnreachableException($"Unknown source result {report.Result.GetType().Name}."),
         };
 
-        SourceStatusResponse Status(SourceStatus status, string? error = null, double? ageSeconds = null) =>
-            new(report.Name, status, report.Duration.TotalMilliseconds, error, ageSeconds);
+        SourceStatusResponse Status(SourceStatus status, string? error = null, double? ageSeconds = null, string? provider = null) =>
+            new(report.Name, status, report.Duration.TotalMilliseconds, error, ageSeconds, provider);
     }
 }
 

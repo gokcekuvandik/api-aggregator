@@ -36,7 +36,7 @@ internal sealed class OpenMeteoSource(SourceFetcher fetcher, IOptions<OpenMeteoO
 
         if (query.City is not null)
         {
-            var (geocoding, failure) = await fetcher.ReadAsync(Name, GeocodingRequest(settings, query.City), OpenMeteoJsonContext.Default.OpenMeteoGeocoding, cancellationToken);
+            var (geocoding, failure) = await fetcher.ReadAsync(settings.ClientFor(Name), GeocodingRequest(settings, query.City), OpenMeteoJsonContext.Default.OpenMeteoGeocoding, cancellationToken);
             if (failure is not null)
             {
                 return failure;
@@ -51,7 +51,7 @@ internal sealed class OpenMeteoSource(SourceFetcher fetcher, IOptions<OpenMeteoO
         }
 
         return await fetcher.FetchAsync(
-            Name,
+            settings.ClientFor(Name),
             ForecastRequest(settings, place),
             OpenMeteoJsonContext.Default.OpenMeteoForecast,
             forecast => WeatherItemMapper.ToItems(Name, place.Name, Readings(forecast.Daily), scorer, query),

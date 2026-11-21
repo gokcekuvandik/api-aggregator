@@ -39,21 +39,24 @@
       "status": "Success",
       "durationMs": "{scrubbed}",
       "error": null,
-      "ageSeconds": null
+      "ageSeconds": null,
+      "provider": null
     },
     {
       "name": "weather",
       "status": "Fallback",
       "durationMs": "{scrubbed}",
       "error": null,
-      "ageSeconds": 90
+      "ageSeconds": 90,
+      "provider": null
     },
     {
       "name": "repositories",
       "status": "Failed",
       "durationMs": "{scrubbed}",
       "error": "repositories is unavailable",
-      "ageSeconds": null
+      "ageSeconds": null,
+      "provider": null
     }
   ],
   "paging": {

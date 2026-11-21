@@ -38,7 +38,7 @@ internal sealed class NewsApiSource(SourceFetcher fetcher, IOptions<NewsApiOptio
         request.Headers.Add(ApiKeyHeader, options.Value.ApiKey);
 
         return fetcher.FetchAsync(
-            Name,
+            options.Value.ClientFor(Name),
             request,
             NewsApiJsonContext.Default.NewsApiResponse,
             response => NewsItemMapper.ToItems(Name, response.Articles.Where(IsAvailable).Select(ToArticle), scorer, query),

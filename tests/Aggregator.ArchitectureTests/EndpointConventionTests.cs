@@ -30,5 +30,5 @@ public sealed class EndpointConventionTests
     public void EndpointScan_ShouldFindEveryFeature_WhenAssemblyIsLoaded() =>
         EndpointRegistration.DiscoverEndpoints()
             .Select(endpoint => endpoint.GetType().Name)
-            .ShouldBe(["GetAggregationEndpoint", "GetSourcesEndpoint", "GetStatisticsEndpoint"]);
+            .ShouldBe(["GetAggregationEndpoint", "GetAggregationStreamEndpoint", "GetSourcesEndpoint", "GetStatisticsEndpoint"]);
 }

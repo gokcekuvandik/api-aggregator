@@ -4,6 +4,7 @@ namespace Aggregator.Api.IntegrationTests.Infrastructure;
 internal static class ApiRoutes
 {
     public const string Aggregation = "/api/v1/aggregation";
+    public const string AggregationStream = "/api/v1/aggregation/stream";
     public const string Sources = "/api/v1/sources";
     public const string Statistics = "/api/v1/statistics";
     public const string OpenApiDocument = "/openapi/v1.json";

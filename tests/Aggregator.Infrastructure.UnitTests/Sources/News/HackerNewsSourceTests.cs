@@ -28,6 +28,16 @@ public sealed class HackerNewsSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task FetchAsync_ShouldSendOnConfiguredClient_WhenRegisteredAsSecondary()
+    {
+        _host.Http.When("*").Respond("application/json", SourceTestHost.Fixture("hn-search.json"));
+
+        await Source(new HackerNewsOptions { ClientName = "news-secondary" }).FetchAsync(SourceTestHost.Query, TestContext.Current.CancellationToken);
+
+        _host.Factory.RequestedNames.ShouldBe(["news-secondary"]);
+    }
+
+    [Fact]
     public async Task FetchAsync_ShouldSearchForRequestText_WhenRequestHasText()
     {
         _host.Http.Expect("*").WithExactQueryString("tags=story&query=rust%20lang&hitsPerPage=20").Respond("application/json", """{"hits":[]}""");

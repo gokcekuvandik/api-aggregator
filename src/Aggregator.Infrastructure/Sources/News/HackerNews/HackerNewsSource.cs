@@ -27,7 +27,7 @@ internal sealed class HackerNewsSource(SourceFetcher fetcher, IOptions<HackerNew
             $"api/v1/search?tags=story&query={Uri.EscapeDataString(query.Text ?? settings.Query)}&hitsPerPage={settings.MaxItems}{CreationFilter(query)}");
 
         return fetcher.FetchAsync(
-            Name,
+            settings.ClientFor(Name),
             new HttpRequestMessage(HttpMethod.Get, path),
             HackerNewsJsonContext.Default.HackerNewsSearch,
             search => NewsItemMapper.ToItems(Name, search.Hits.Select(ToArticle), scorer, query),

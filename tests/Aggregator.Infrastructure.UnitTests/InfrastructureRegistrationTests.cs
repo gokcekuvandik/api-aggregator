@@ -21,17 +21,37 @@ public sealed class InfrastructureRegistrationTests
     {
         using var provider = Build([]);
 
-        provider.GetServices<IDataSource>().Select(s => s.GetType())
-            .ShouldBe([typeof(OpenMeteoSource), typeof(HackerNewsSource), typeof(GitHubSource)]);
+        var sources = Composed(provider);
+
+        sources.Select(s => s.Primary.Source.GetType()).ShouldBe([typeof(OpenMeteoSource), typeof(HackerNewsSource), typeof(GitHubSource)]);
+        sources.ShouldAllBe(s => s.Secondary == null);
     }
 
     [Fact]
-    public void AddInfrastructure_ShouldRegisterKeyedProviders_WhenKeysAreConfigured()
+    public void AddInfrastructure_ShouldRegisterKeyedProvidersWithKeylessSecondaries_WhenKeysAreConfigured()
     {
         using var provider = Build(new() { ["Sources:weather:ApiKey"] = "w", ["Sources:news:ApiKey"] = "n" });
 
-        provider.GetServices<IDataSource>().Select(s => s.GetType())
-            .ShouldBe([typeof(OpenWeatherMapSource), typeof(NewsApiSource), typeof(GitHubSource)]);
+        var sources = Composed(provider);
+
+        sources.Select(s => s.Primary.Source.GetType()).ShouldBe([typeof(OpenWeatherMapSource), typeof(NewsApiSource), typeof(GitHubSource)]);
+        sources.Select(s => s.Secondary?.Source.GetType()).ShouldBe([typeof(OpenMeteoSource), typeof(HackerNewsSource), null]);
+        sources.Select(s => s.Secondary?.Name).ShouldBe(["open-meteo", "hacker-news", null]);
+    }
+
+    [Fact]
+    public void AddInfrastructure_ShouldReadSecondarySettingsFromSecondarySection_WhenKeysAreConfigured()
+    {
+        using var provider = Build(new()
+        {
+            ["Sources:weather:ApiKey"] = "w",
+            ["Sources:weather:Secondary:Location"] = "Paris",
+        });
+
+        var options = provider.GetRequiredService<IOptions<OpenMeteoOptions>>().Value;
+
+        options.Location.ShouldBe("Paris");
+        options.ClientName.ShouldBe("weather-secondary");
     }
 
     [Theory]
@@ -41,8 +61,11 @@ public sealed class InfrastructureRegistrationTests
     {
         using var provider = Build(new() { ["Sources:weather:ApiKey"] = key });
 
-        provider.GetServices<IDataSource>().First().ShouldBeOfType<OpenMeteoSource>();
+        Composed(provider).First().Primary.Source.ShouldBeOfType<OpenMeteoSource>();
     }
+
+    private static List<ResilientDataSource> Composed(ServiceProvider provider) =>
+        [.. provider.GetServices<IDataSource>().Select(source => source.ShouldBeOfType<ResilientDataSource>())];
 
     [Fact]
     public void AddInfrastructure_ShouldNameEverySourceUniquely_WhenRegistered()

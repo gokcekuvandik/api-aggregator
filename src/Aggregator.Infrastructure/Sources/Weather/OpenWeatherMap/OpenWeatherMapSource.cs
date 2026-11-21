@@ -43,7 +43,7 @@ internal sealed class OpenWeatherMapSource(SourceFetcher fetcher, IOptions<OpenW
             $"data/2.5/forecast?{where}&units=metric&cnt={settings.ForecastDays * ReadingsPerDay}&appid={Uri.EscapeDataString(settings.ApiKey ?? string.Empty)}");
 
         return fetcher.FetchAsync(
-            Name,
+            settings.ClientFor(Name),
             new HttpRequestMessage(HttpMethod.Get, path),
             OpenWeatherMapJsonContext.Default.OpenWeatherMapForecast,
             forecast => WeatherItemMapper.ToItems(Name, Location(forecast, city, settings), forecast.List.Select(ToReading), scorer, query),

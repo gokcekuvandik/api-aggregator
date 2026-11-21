@@ -54,7 +54,7 @@ internal sealed class GitHubSource(SourceFetcher fetcher, IOptions<GitHubOptions
         }
 
         return fetcher.FetchAsync(
-            Name,
+            settings.ClientFor(Name),
             request,
             GitHubJsonContext.Default.GitHubSearch,
             search => ToItems(search.Items, query),

@@ -1,7 +1,7 @@
 using Aggregator.Infrastructure.Sources.Http;
 using Aggregator.Infrastructure.Sources.News.HackerNews;
-using Aggregator.Infrastructure.Sources.Relevance;
 using Aggregator.Infrastructure.Sources.News.NewsApi;
+using Aggregator.Infrastructure.Sources.Relevance;
 using Aggregator.Infrastructure.Sources.Repositories.GitHub;
 using Aggregator.Infrastructure.Sources.Weather.OpenMeteo;
 using Aggregator.Infrastructure.Sources.Weather.OpenWeatherMap;
@@ -11,7 +11,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Aggregator.Infrastructure.Sources;
 
-/// <summary>Registers one provider per category; a configured API key switches to the keyed provider.</summary>
+/// <summary>
+/// Registers one source per category. A configured API key makes the keyed provider primary, with the keyless one as its secondary;
+/// without a key the keyless provider is the only one.
+/// </summary>
 internal static class SourceRegistration
 {
     private const string ApiKeySetting = "ApiKey";
@@ -26,6 +29,7 @@ internal static class SourceRegistration
         if (HasApiKey(configuration, SourceNames.Weather))
         {
             services.AddDataSource<OpenWeatherMapSource, OpenWeatherMapOptions>(SourceNames.Weather);
+            services.AddSecondaryDataSource<OpenMeteoSource, OpenMeteoOptions>(SourceNames.Weather, ProviderNames.OpenMeteo);
         }
         else
         {
@@ -35,6 +39,7 @@ internal static class SourceRegistration
         if (HasApiKey(configuration, SourceNames.News))
         {
             services.AddDataSource<NewsApiSource, NewsApiOptions>(SourceNames.News);
+            services.AddSecondaryDataSource<HackerNewsSource, HackerNewsOptions>(SourceNames.News, ProviderNames.HackerNews);
         }
         else
         {
