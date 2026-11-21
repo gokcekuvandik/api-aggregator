@@ -9,7 +9,8 @@
       "status": "Failed",
       "durationMs": "{scrubbed}",
       "error": "news is unavailable",
-      "ageSeconds": null
+      "ageSeconds": null,
+      "provider": null
     }
   ],
   "traceId": "{scrubbed}"

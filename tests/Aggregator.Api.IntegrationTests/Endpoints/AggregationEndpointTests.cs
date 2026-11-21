@@ -64,6 +64,21 @@ public sealed class AggregationEndpointTests(AggregatorApiFactory factory) : ICl
 
         var source = (await response.ShouldBeJson(HttpStatusCode.OK)).GetProperty("sources")[0];
         source.GetProperty("ageSeconds").GetDouble().ShouldBe(90);
+        source.GetProperty("provider").ValueKind.ShouldBe(System.Text.Json.JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Get_ShouldNameSecondaryProvider_WhenItServedTheSource()
+    {
+        var secondary = new SourceFallback([], TimeSpan.Zero, Provider: "hacker-news");
+        using var client = factory.CreateClientWith(new StubDataSource("news", secondary));
+
+        using var response = await client.GetAsync(Url, TestContext.Current.CancellationToken);
+
+        var source = (await response.ShouldBeJson(HttpStatusCode.OK)).GetProperty("sources")[0];
+        source.GetProperty("status").GetString().ShouldBe("Fallback");
+        source.GetProperty("ageSeconds").GetDouble().ShouldBe(0);
+        source.GetProperty("provider").GetString().ShouldBe("hacker-news");
     }
 
     [Fact]

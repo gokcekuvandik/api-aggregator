@@ -42,6 +42,17 @@ public sealed class SourceFetcherTests : IDisposable
         _factory.RequestedNames.ShouldBe([SourceName]);
     }
 
+    [Fact]
+    public async Task FetchAsync_ShouldUseClientNameButReportSourceName_WhenTheyDiffer()
+    {
+        _http.When($"{StubHttpClientFactory.DefaultBaseAddress}{Path}").Respond(HttpStatusCode.BadGateway);
+
+        var result = await FetchAsync(new SourceClient(SourceName, "test-secondary"), ToItems, TestContext.Current.CancellationToken);
+
+        _factory.RequestedNames.ShouldBe(["test-secondary"]);
+        result.ShouldBeOfType<SourceFailure>().Error.ShouldBe("test answered HTTP 502.");
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.NotFound)]
     [InlineData(HttpStatusCode.TooManyRequests)]
@@ -162,7 +173,10 @@ public sealed class SourceFetcherTests : IDisposable
     }
 
     private Task<SourceResult> FetchAsync(Func<NamesPayload, IReadOnlyList<AggregatedItem>> map, CancellationToken cancellationToken) =>
-        _fetcher.FetchAsync(SourceName, new HttpRequestMessage(HttpMethod.Get, Path), TestPayloadJsonContext.Default.NamesPayload, map, cancellationToken);
+        FetchAsync(new SourceClient(SourceName, SourceName), map, cancellationToken);
+
+    private Task<SourceResult> FetchAsync(SourceClient client, Func<NamesPayload, IReadOnlyList<AggregatedItem>> map, CancellationToken cancellationToken) =>
+        _fetcher.FetchAsync(client, new HttpRequestMessage(HttpMethod.Get, Path), TestPayloadJsonContext.Default.NamesPayload, map, cancellationToken);
 
     private static IReadOnlyList<AggregatedItem> ToItems(NamesPayload payload) =>
         [.. payload.Names.Select(name => new AggregatedItem(

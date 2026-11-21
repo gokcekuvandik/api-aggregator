@@ -11,7 +11,7 @@ using Polly.Timeout;
 namespace Aggregator.Infrastructure.Sources;
 
 /// <summary>
-/// Sends one request on the source's named client and maps the JSON payload to items.
+/// Sends one request on the given named client and maps the JSON payload to items; errors always name the public source.
 /// Transport, timeout, circuit and payload failures become a safe <see cref="SourceFailure"/> and are logged with details.
 /// Caller cancellation and mapping bugs still throw.
 /// </summary>
@@ -19,19 +19,19 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
 {
     /// <summary>Takes ownership of <paramref name="request"/> and disposes it.</summary>
     public Task<SourceResult> FetchAsync<TPayload>(
-        string sourceName,
+        SourceClient client,
         HttpRequestMessage request,
         JsonTypeInfo<TPayload> payloadType,
         Func<TPayload, IReadOnlyList<AggregatedItem>> toItems,
         CancellationToken cancellationToken) =>
-        FetchAsync(sourceName, request, payloadType, toItems, noItemsStatus: null, cancellationToken);
+        FetchAsync(client, request, payloadType, toItems, noItemsStatus: null, cancellationToken);
 
     /// <summary>
     /// Like the overload above, but an answer of <paramref name="noItemsStatus"/> means nothing matched and yields no items.
     /// Use it only where the upstream signals "no match" with that status, such as an unknown city name.
     /// </summary>
     public async Task<SourceResult> FetchAsync<TPayload>(
-        string sourceName,
+        SourceClient client,
         HttpRequestMessage request,
         JsonTypeInfo<TPayload> payloadType,
         Func<TPayload, IReadOnlyList<AggregatedItem>> toItems,
@@ -40,28 +40,28 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
     {
         ArgumentNullException.ThrowIfNull(toItems);
 
-        var (payload, outcome) = await ReadCoreAsync(sourceName, request, payloadType, noItemsStatus, cancellationToken);
+        var (payload, outcome) = await ReadCoreAsync(client, request, payloadType, noItemsStatus, cancellationToken);
         return outcome ?? new SourceSuccess(toItems(payload!));
     }
 
     /// <summary>
-    /// Like <see cref="FetchAsync{TPayload}(string, HttpRequestMessage, JsonTypeInfo{TPayload}, Func{TPayload, IReadOnlyList{AggregatedItem}}, CancellationToken)"/>
+    /// Like <see cref="FetchAsync{TPayload}(SourceClient, HttpRequestMessage, JsonTypeInfo{TPayload}, Func{TPayload, IReadOnlyList{AggregatedItem}}, CancellationToken)"/>
     /// but hands back the payload, for a request whose answer feeds the next one.
     /// Exactly one of the two values is set. Takes ownership of <paramref name="request"/> and disposes it.
     /// </summary>
     public async Task<(TPayload? Payload, SourceFailure? Failure)> ReadAsync<TPayload>(
-        string sourceName,
+        SourceClient client,
         HttpRequestMessage request,
         JsonTypeInfo<TPayload> payloadType,
         CancellationToken cancellationToken)
     {
-        var (payload, outcome) = await ReadCoreAsync(sourceName, request, payloadType, noItemsStatus: null, cancellationToken);
+        var (payload, outcome) = await ReadCoreAsync(client, request, payloadType, noItemsStatus: null, cancellationToken);
         return (payload, outcome as SourceFailure);
     }
 
     /// <summary>Either the payload, or the result to return instead of mapping it: a failure, or no items.</summary>
     private async Task<(TPayload? Payload, SourceResult? Outcome)> ReadCoreAsync<TPayload>(
-        string sourceName,
+        SourceClient client,
         HttpRequestMessage request,
         JsonTypeInfo<TPayload> payloadType,
         HttpStatusCode? noItemsStatus,
@@ -74,11 +74,11 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
         {
             try
             {
-                sent = await SendAsync(sourceName, request, payloadType, noItemsStatus, cancellationToken);
+                sent = await SendAsync(client.ClientName, request, payloadType, noItemsStatus, cancellationToken);
             }
-            catch (Exception exception) when (Describe(exception, sourceName, cancellationToken) is { } error)
+            catch (Exception exception) when (Describe(exception, client.SourceName, cancellationToken) is { } error)
             {
-                LogSourceFailed(sourceName, error, exception);
+                LogSourceFailed(client.SourceName, client.ClientName, error, exception);
                 return (default, new SourceFailure(error));
             }
         }
@@ -90,8 +90,8 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
 
         if (sent.Payload is null)
         {
-            var error = Unreadable(sourceName);
-            LogSourceFailed(sourceName, error, exception: null);
+            var error = Unreadable(client.SourceName);
+            LogSourceFailed(client.SourceName, client.ClientName, error, exception: null);
             return (default, new SourceFailure(error));
         }
 
@@ -99,9 +99,9 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
     }
 
     private async Task<(bool NoItems, TPayload? Payload)> SendAsync<TPayload>(
-        string sourceName, HttpRequestMessage request, JsonTypeInfo<TPayload> payloadType, HttpStatusCode? noItemsStatus, CancellationToken cancellationToken)
+        string clientName, HttpRequestMessage request, JsonTypeInfo<TPayload> payloadType, HttpStatusCode? noItemsStatus, CancellationToken cancellationToken)
     {
-        var client = httpClientFactory.CreateClient(sourceName);
+        var client = httpClientFactory.CreateClient(clientName);
         // The body is buffered inside the pipeline, so the resilience timeouts and the client's size cap cover it too.
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken);
         if (response.StatusCode == noItemsStatus)
@@ -118,7 +118,7 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
         OperationCanceledException when cancellationToken.IsCancellationRequested => null,
         HttpRequestException { StatusCode: { } status } => $"{sourceName} answered HTTP {(int)status}.",
         HttpRequestException or IOException => $"{sourceName} could not be reached.",
-        TimeoutRejectedException or OperationCanceledException => $"{sourceName} timed out.",
+        TimeoutRejectedException or OperationCanceledException => SourceFailure.TimedOut(sourceName).Error,
         ExecutionRejectedException => $"{sourceName} is temporarily unavailable.",
         JsonException => Unreadable(sourceName),
         _ => null,
@@ -126,6 +126,6 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
 
     private static string Unreadable(string sourceName) => $"{sourceName} returned an unreadable response.";
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Source {Source} failed: {Error}")]
-    private partial void LogSourceFailed(string source, string error, Exception? exception);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Source {Source} failed on client {Client}: {Error}")]
+    private partial void LogSourceFailed(string source, string client, string error, Exception? exception);
 }

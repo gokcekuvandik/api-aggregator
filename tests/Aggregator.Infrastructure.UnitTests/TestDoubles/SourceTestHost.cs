@@ -10,10 +10,15 @@ internal sealed class SourceTestHost : IDisposable
 {
     public static readonly AggregationQuery Query = new(Page: 1, PageSize: 20);
 
-    public SourceTestHost() =>
-        Fetcher = new SourceFetcher(new StubHttpClientFactory(Http, StubHttpClientFactory.DefaultBaseAddress), NullLogger<SourceFetcher>.Instance);
+    public SourceTestHost()
+    {
+        Factory = new StubHttpClientFactory(Http, StubHttpClientFactory.DefaultBaseAddress);
+        Fetcher = new SourceFetcher(Factory, NullLogger<SourceFetcher>.Instance);
+    }
 
     public MockHttpMessageHandler Http { get; } = new();
+
+    public StubHttpClientFactory Factory { get; }
 
     public SourceFetcher Fetcher { get; }
 

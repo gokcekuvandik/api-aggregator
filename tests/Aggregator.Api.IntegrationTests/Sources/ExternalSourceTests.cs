@@ -77,7 +77,7 @@ public sealed class ExternalSourceTests : IClassFixture<AggregatorApiFactory>, I
         var repositories = Source(body, "repositories");
         repositories.GetProperty("status").GetString().ShouldBe("Failed");
         repositories.GetProperty("error").GetString().ShouldBe("repositories answered HTTP 500.");
-        _upstream.RequestCount(UpstreamServer.GitHubPath).ShouldBe(4);
+        _upstream.RequestCount(UpstreamServer.GitHubPath).ShouldBe(3);
         Source(body, "news").GetProperty("status").GetString().ShouldBe("Success");
     }
 

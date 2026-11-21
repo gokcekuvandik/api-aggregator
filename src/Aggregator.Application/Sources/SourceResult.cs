@@ -17,8 +17,14 @@ public sealed record SourceSuccess(IReadOnlyList<AggregatedItem> Items) : Source
 /// <summary>The answer came from a fresh cache entry.</summary>
 public sealed record SourceCached(IReadOnlyList<AggregatedItem> Items) : SourceResult(Items);
 
-/// <summary>The source failed; these are last-known-good items of the given age.</summary>
-public sealed record SourceFallback(IReadOnlyList<AggregatedItem> Items, TimeSpan Age) : SourceResult(Items);
+/// <summary>
+/// The primary provider failed. The items come from the named secondary provider (age zero),
+/// or, when <paramref name="Provider"/> is null, from the last-known-good store at the given age.
+/// </summary>
+public sealed record SourceFallback(IReadOnlyList<AggregatedItem> Items, TimeSpan Age, string? Provider = null) : SourceResult(Items);
 
 /// <summary>The source failed and nothing could stand in for it.</summary>
-public sealed record SourceFailure(string Error) : SourceResult([]);
+public sealed record SourceFailure(string Error) : SourceResult([])
+{
+    public static SourceFailure TimedOut(string sourceName) => new($"{sourceName} timed out.");
+}

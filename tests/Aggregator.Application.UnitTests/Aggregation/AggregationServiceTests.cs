@@ -82,6 +82,80 @@ public sealed class AggregationServiceTests
     }
 
     [Fact]
+    public async Task StreamAsync_ShouldYieldEachSourceAsItCompletes_WhenSourcesFinishAtDifferentTimes()
+    {
+        var slow = new TaskCompletionSource<SourceResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = Substitute.For<IDataSource>();
+        first.Name.Returns("slow");
+        first.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns(slow.Task);
+        var service = Service(first, Source("fast", new SourceSuccess([])));
+        var names = new List<string>();
+
+        await foreach (var update in service.StreamAsync(DefaultQuery, TestContext.Current.CancellationToken))
+        {
+            names.Add(update.Report.Name);
+            if (update.Report.Name == "fast")
+            {
+                slow.SetResult(new SourceSuccess([]));
+            }
+        }
+
+        names.ShouldBe(["fast", "slow"]);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ShouldFilterAndSortEachSourceWithoutPaging_WhenQueryHasCriteria()
+    {
+        var from = TestItems.PublishedAt.AddHours(-1);
+        var service = Service(Source("news", new SourceSuccess(
+        [
+            TestItems.Item("low", relevance: 0.1),
+            TestItems.Item("too-old", publishedAt: from.AddTicks(-1), relevance: 1),
+            TestItems.Item("high", relevance: 0.9),
+            TestItems.Item("mid", relevance: 0.5),
+        ])));
+        var query = new AggregationQuery(Page: 2, PageSize: 1) { From = from };
+
+        var updates = await ToListAsync(service.StreamAsync(query, TestContext.Current.CancellationToken));
+
+        var update = updates.ShouldHaveSingleItem();
+        update.Items.Select(i => i.Id).ShouldBe(["high", "mid", "low"]);
+        update.Report.Result.ShouldBeOfType<SourceSuccess>();
+    }
+
+    [Fact]
+    public async Task StreamAsync_ShouldCancelPendingFetches_WhenConsumerStopsEarly()
+    {
+        var pendingToken = new TaskCompletionSource<CancellationToken>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var slow = Substitute.For<IDataSource>();
+        slow.Name.Returns("slow");
+        slow.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            var token = call.Arg<CancellationToken>();
+            pendingToken.SetResult(token);
+            return Task.Delay(Timeout.InfiniteTimeSpan, token).ContinueWith<SourceResult>(_ => new SourceSuccess([]), TaskScheduler.Default);
+        });
+        var service = Service(slow, Source("fast", new SourceSuccess([])));
+
+        await foreach (var update in service.StreamAsync(DefaultQuery, TestContext.Current.CancellationToken))
+        {
+            update.Report.Name.ShouldBe("fast");
+            break;
+        }
+
+        (await pendingToken.Task).IsCancellationRequested.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task StreamAsync_ShouldThrow_WhenQueryIsInvalid()
+    {
+        var service = Service(Source("news", new SourceSuccess([])));
+
+        await Should.ThrowAsync<ArgumentException>(() =>
+            ToListAsync(service.StreamAsync(DefaultQuery with { Sources = ["nope"] }, TestContext.Current.CancellationToken)));
+    }
+
+    [Fact]
     public async Task AggregateAsync_ShouldCallOnlyNamedSources_WhenSourcesAreGiven()
     {
         var news = Source("news", new SourceSuccess([]));
@@ -163,6 +237,17 @@ public sealed class AggregationServiceTests
     }
 
     private static AggregationService Service(params IDataSource[] sources) => new(new DataSourceRegistry(sources));
+
+    private static async Task<List<SourceUpdate>> ToListAsync(IAsyncEnumerable<SourceUpdate> updates)
+    {
+        var list = new List<SourceUpdate>();
+        await foreach (var update in updates)
+        {
+            list.Add(update);
+        }
+
+        return list;
+    }
 
     private static IDataSource Source(string name, SourceResult result) => TestSources.Returning(name, result);
 }

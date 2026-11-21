@@ -29,6 +29,19 @@ public sealed class OpenMeteoSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task FetchAsync_ShouldSendEveryRequestOnConfiguredClient_WhenRegisteredAsSecondary()
+    {
+        _host.Http.When("*v1/search*").Respond("application/json", SourceTestHost.Fixture("open-meteo-geocoding.json"));
+        _host.Http.When("*v1/forecast*").Respond("application/json", SourceTestHost.Fixture("open-meteo-forecast.json"));
+
+        var result = await Source(new OpenMeteoOptions { ClientName = "weather-secondary" })
+            .FetchAsync(SourceTestHost.Query with { City = "Paris" }, TestContext.Current.CancellationToken);
+
+        result.ShouldBeOfType<SourceSuccess>().Items.ShouldAllBe(item => item.Source == "weather");
+        _host.Factory.RequestedNames.ShouldBe(["weather-secondary", "weather-secondary"]);
+    }
+
+    [Fact]
     public async Task FetchAsync_ShouldWriteCoordinatesWithoutExponent_WhenTheyAreTiny()
     {
         _host.Http.Expect("*").WithQueryString("latitude", "0.00001").WithQueryString("longitude", "-0.5").Respond("application/json", SourceTestHost.Fixture("open-meteo-forecast.json"));

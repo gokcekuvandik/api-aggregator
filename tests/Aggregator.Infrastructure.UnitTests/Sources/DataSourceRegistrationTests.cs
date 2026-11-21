@@ -56,9 +56,92 @@ public sealed class DataSourceRegistrationTests
     {
         using var provider = Build([]);
 
-        var source = provider.GetServices<IDataSource>().ShouldHaveSingleItem();
+        var source = provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<ResilientDataSource>();
 
-        source.ShouldBeOfType<FakeSource>().Name.ShouldBe(Name);
+        source.Name.ShouldBe(Name);
+        source.Primary.Source.ShouldBeOfType<FakeSource>();
+        source.Primary.Timeout.ShouldBe(TimeSpan.FromSeconds(10));
+        source.Secondary.ShouldBeNull();
+    }
+
+    [Fact]
+    public void AddDataSource_ShouldUseConfiguredTimeout_WhenSet()
+    {
+        using var provider = Build(new()
+        {
+            ["Sources:fake:Timeout"] = "00:00:04",
+            ["Sources:fake:Resilience:TotalRequestTimeout:Timeout"] = "00:00:03",
+        });
+
+        provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<ResilientDataSource>().Primary.Timeout.ShouldBe(TimeSpan.FromSeconds(4));
+    }
+
+    [Theory]
+    [InlineData("00:00:00.5")]
+    [InlineData("00:01:01")]
+    public async Task AddDataSource_ShouldFailAtStartup_WhenTimeoutIsOutOfRange(string timeout)
+    {
+        using var provider = Build(new() { ["Sources:fake:Timeout"] = timeout });
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => ValidateAtStartupAsync(provider));
+
+        exception.Message.ShouldContain(nameof(DataSourceOptions.Timeout));
+    }
+
+    [Fact]
+    public void AddSecondaryDataSource_ShouldComposeBothProviders_WhenRegistered()
+    {
+        using var provider = BuildWithSecondary([]);
+
+        var source = provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<ResilientDataSource>();
+
+        source.Primary.Source.ShouldBeOfType<FakeSource>();
+        var secondary = source.Secondary.ShouldNotBeNull();
+        secondary.Name.ShouldBe("fake-backup");
+        secondary.Source.ShouldBeOfType<BackupSource>().Name.ShouldBe(Name);
+    }
+
+    [Fact]
+    public void AddSecondaryDataSource_ShouldBindOwnSectionAndClient_WhenRegistered()
+    {
+        using var provider = BuildWithSecondary(new()
+        {
+            ["Sources:fake:BaseAddress"] = "https://primary.test/",
+            ["Sources:fake:Secondary:BaseAddress"] = "https://secondary.test/",
+            ["Sources:fake:Secondary:Timeout"] = "00:00:03",
+            ["Sources:fake:Secondary:Resilience:TotalRequestTimeout:Timeout"] = "00:00:02",
+            ["Sources:fake:Secondary:Resilience:AttemptTimeout:Timeout"] = "00:00:01",
+        });
+
+        var options = provider.GetRequiredService<IOptions<BackupOptions>>().Value;
+        using var primaryClient = provider.GetRequiredService<IHttpClientFactory>().CreateClient(Name);
+        using var secondaryClient = provider.GetRequiredService<IHttpClientFactory>().CreateClient("fake-secondary");
+
+        options.ClientName.ShouldBe("fake-secondary");
+        primaryClient.BaseAddress.ShouldBe(new Uri("https://primary.test/"));
+        secondaryClient.BaseAddress.ShouldBe(new Uri("https://secondary.test/"));
+        provider.GetServices<IDataSource>().ShouldHaveSingleItem().ShouldBeOfType<ResilientDataSource>().Secondary!.Timeout.ShouldBe(TimeSpan.FromSeconds(3));
+    }
+
+    [Fact]
+    public async Task AddSecondaryDataSource_ShouldNameItsOwnSection_WhenItsOptionsAreInvalid()
+    {
+        using var provider = BuildWithSecondary(new() { ["Sources:fake:Secondary:BaseAddress"] = "http://secondary.test/" });
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => ValidateAtStartupAsync(provider));
+
+        exception.Message.ShouldContain("Sources:fake:Secondary:BaseAddress");
+    }
+
+    [Fact]
+    public void AddSecondaryDataSource_ShouldThrowOnResolve_WhenSecondaryReportsAnotherName()
+    {
+        var services = Services([]);
+        services.AddDataSource<FakeSource, FakeOptions>("other");
+        services.AddSecondaryDataSource<BackupSource, BackupOptions>("other", "fake-backup");
+        using var provider = services.BuildServiceProvider();
+
+        Should.Throw<InvalidOperationException>(() => provider.GetServices<IDataSource>().ToList()).Message.ShouldContain("other");
     }
 
     [Fact]
@@ -120,6 +203,17 @@ public sealed class DataSourceRegistrationTests
     }
 
     [Fact]
+    public void AddSecondaryDataSource_ShouldThrow_WhenProviderTypeIsAlreadyRegistered()
+    {
+        var services = Services([]);
+        services.AddDataSource<FakeSource, FakeOptions>(Name);
+
+        var exception = Should.Throw<InvalidOperationException>(() => services.AddSecondaryDataSource<FakeSource, FakeOptions>(Name, "again"));
+
+        exception.Message.ShouldContain(nameof(FakeSource));
+    }
+
+    [Fact]
     public void AddDataSource_ShouldThrowOnResolve_WhenSourceNameDiffersFromRegisteredName()
     {
         var services = Services([]);
@@ -164,7 +258,30 @@ public sealed class DataSourceRegistrationTests
         return services.BuildServiceProvider();
     }
 
+    private static ServiceProvider BuildWithSecondary(Dictionary<string, string?> settings)
+    {
+        var services = Services(settings);
+        services.AddDataSource<FakeSource, FakeOptions>(Name);
+        services.AddSecondaryDataSource<BackupSource, BackupOptions>(Name, "fake-backup");
+        return services.BuildServiceProvider();
+    }
+
     private static ServiceCollection Services(Dictionary<string, string?> settings) => TestServices.Create(settings);
+
+    public sealed class BackupOptions : DataSourceOptions
+    {
+        public BackupOptions() => BaseAddress = new Uri("https://backup.test/");
+    }
+
+    public sealed class BackupSource : IDataSource
+    {
+        public string Name => DataSourceRegistrationTests.Name;
+
+        public IReadOnlyList<string> Categories { get; } = ["fake"];
+
+        public Task<SourceResult> FetchAsync(AggregationQuery query, CancellationToken cancellationToken) =>
+            Task.FromResult<SourceResult>(new SourceSuccess([]));
+    }
 
     public sealed class FakeOptions : DataSourceOptions
     {

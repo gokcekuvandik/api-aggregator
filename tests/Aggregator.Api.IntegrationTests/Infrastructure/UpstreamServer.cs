@@ -5,7 +5,7 @@ using WireMock.Server;
 namespace Aggregator.Api.IntegrationTests.Infrastructure;
 
 /// <summary>One WireMock server standing in for every upstream API, with the recorded payloads; a test class shares it and resets it per test.</summary>
-public sealed class UpstreamServer : IDisposable
+public sealed class UpstreamServer : IAsyncLifetime
 {
     public const string OpenMeteoPath = "/v1/forecast";
     public const string OpenWeatherMapPath = "/data/2.5/forecast";
@@ -28,6 +28,9 @@ public sealed class UpstreamServer : IDisposable
     {
         ["Sources:weather:BaseAddress"] = BaseAddress,
         ["Sources:weather:GeocodingAddress"] = BaseAddress,
+        ["Sources:weather:Secondary:BaseAddress"] = BaseAddress,
+        ["Sources:weather:Secondary:GeocodingAddress"] = BaseAddress,
+        ["Sources:news:Secondary:BaseAddress"] = BaseAddress,
         ["Sources:news:BaseAddress"] = BaseAddress,
         ["Sources:repositories:BaseAddress"] = BaseAddress,
         ["Sources:weather:ApiKey"] = string.Empty,
@@ -62,5 +65,16 @@ public sealed class UpstreamServer : IDisposable
 
     public static string Fixture(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", name));
 
-    public void Dispose() => Server.Stop();
+    /// <summary>The first requests to a fresh server can stall for seconds under a busy test run, so one is spent here rather than in a test.</summary>
+    public async ValueTask InitializeAsync()
+    {
+        using var client = new HttpClient();
+        using var response = await client.GetAsync(new Uri($"{Server.Url}/warm-up"), TestContext.Current.CancellationToken);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Server.Stop();
+        return ValueTask.CompletedTask;
+    }
 }
