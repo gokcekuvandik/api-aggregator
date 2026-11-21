@@ -3,10 +3,7 @@ using Aggregator.Api.IntegrationTests.Infrastructure;
 
 namespace Aggregator.Api.IntegrationTests.Snapshots;
 
-/// <summary>
-/// ADR-0002 confirmation: the OpenAPI document and the response shapes are pinned.
-/// A contract change shows up as a diff in a <c>.verified.json</c> file.
-/// </summary>
+/// <summary>Pins the OpenAPI document and response shapes as <c>.verified.json</c> files.</summary>
 public sealed class ContractSnapshotTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
     [Fact]

@@ -13,7 +13,7 @@ internal static class ResponseAssertions
         return JsonElement.Parse(body);
     }
 
-    /// <summary>Asserts an RFC 9457 body that carries a trace id (ADR-0002).</summary>
+    /// <summary>Asserts an RFC 9457 body that carries a trace id.</summary>
     public static async Task<JsonElement> ShouldBeProblem(this HttpResponseMessage response, HttpStatusCode expected)
     {
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);

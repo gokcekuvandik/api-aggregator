@@ -5,7 +5,7 @@ using Aggregator.Application.UnitTests.TestData;
 
 namespace Aggregator.Application.UnitTests.Aggregation;
 
-/// <summary>ADR-0002 / ADR-0014 decision table: source states → is any data available?</summary>
+/// <summary>Source states mapped to whether any data is available.</summary>
 public sealed class AggregationResultTests
 {
     private static readonly SourceResult Success = new SourceSuccess(TestItems.Many(1));

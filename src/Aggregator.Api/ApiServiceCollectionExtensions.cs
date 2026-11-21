@@ -6,16 +6,13 @@ namespace Aggregator.Api;
 
 internal static class ApiServiceCollectionExtensions
 {
-    /// <summary>HTTP-contract services: ProblemDetails, validation, versioning, OpenAPI (ADR-0002).</summary>
+    /// <summary>Registers ProblemDetails, validation, API versioning and OpenAPI.</summary>
     public static IServiceCollection AddApi(this IServiceCollection services)
     {
-        // RFC 9457 bodies everywhere. The default writer adds "traceId".
         services.AddProblemDetails(options => options.CustomizeProblemDetails = ValidationErrorKeys.CamelCase);
 
-        // Validates [AsParameters] / body types before the handler runs; failures are 400 ProblemDetails.
         services.AddValidation();
 
-        // Numbers are numbers: no "123"-as-string in bodies, and OpenAPI types them as plain integers.
         services.ConfigureHttpJsonOptions(options => options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict);
 
         services.AddApiVersioning(options =>

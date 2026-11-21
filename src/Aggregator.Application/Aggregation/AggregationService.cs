@@ -4,10 +4,7 @@ using Aggregator.Application.Sources;
 
 namespace Aggregator.Application.Aggregation;
 
-/// <summary>
-/// Fans out to every registered source concurrently, merges their items and pages the result.
-/// Per-source timeouts and fallback arrive with ADR-0006; filtering and sorting with ADR-0005.
-/// </summary>
+/// <summary>Queries every source concurrently, merges their items and pages the result.</summary>
 public sealed class AggregationService(IEnumerable<IDataSource> sources)
 {
     private readonly IReadOnlyList<IDataSource> _sources = [.. sources];

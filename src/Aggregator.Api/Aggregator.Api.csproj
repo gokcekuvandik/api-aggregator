@@ -1,17 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <!--
-      AV0029 / AV0030 recommend Asp.Versioning.OpenApi. Its 10.x line pins Microsoft.OpenApi 2.x,
-      while Microsoft.AspNetCore.OpenApi 11 needs 3.x (NU1107). The built-in generator reads the
-      versioned ApiExplorer groups instead, so the warnings do not apply. Revisit when an
-      Asp.Versioning.OpenApi release targets Microsoft.OpenApi 3.
-    -->
+    <!-- Asp.Versioning.OpenApi needs Microsoft.OpenApi 2.x, which conflicts with AspNetCore.OpenApi 11. -->
     <NoWarn>$(NoWarn);AV0029;AV0030</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The architecture tests check the real endpoint scan, not a copy of its predicate. -->
     <InternalsVisibleTo Include="Aggregator.ArchitectureTests" />
   </ItemGroup>
 

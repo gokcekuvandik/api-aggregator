@@ -10,9 +10,6 @@ public sealed record SourceReport(string Name, SourceResult Result, TimeSpan Dur
 /// <summary>The paged, merged items plus a report per source.</summary>
 public sealed record AggregationResult(PagedList<AggregatedItem> Items, IReadOnlyList<SourceReport> Sources)
 {
-    /// <summary>
-    /// True when at least one source produced a usable answer (live, cached or fallback).
-    /// ADR-0002 maps true to 200 and false to 503.
-    /// </summary>
+    /// <summary>True when at least one source returned live, cached or fallback data.</summary>
     public bool HasData => Sources.Any(s => s.Result is not SourceFailure);
 }

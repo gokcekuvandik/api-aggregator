@@ -6,13 +6,8 @@ using System.Text.Json.Nodes;
 namespace Aggregator.Api.IntegrationTests.Snapshots;
 
 /// <summary>
-/// Minimal JSON snapshot testing (ADR-0002 confirmation). The normalised JSON is compared with
-/// <c>{Class}.{Test}.verified.json</c> next to the test file.
-/// <list type="bullet">
-/// <item>On a mismatch, or when no snapshot exists yet, <c>.received.json</c> is written and the test fails.
-/// Review it and rename it to <c>.verified.json</c> to accept.</item>
-/// <item>With <c>AGGREGATOR_UPDATE_SNAPSHOTS=1</c> the verified file is overwritten instead.</item>
-/// </list>
+/// Compares normalised JSON with <c>{Class}.{Test}.verified.json</c> next to the test file.
+/// On a mismatch it writes <c>.received.json</c> and fails; <c>AGGREGATOR_UPDATE_SNAPSHOTS=1</c> overwrites the verified file instead.
 /// </summary>
 internal static class JsonSnapshot
 {
@@ -22,8 +17,7 @@ internal static class JsonSnapshot
     /// <summary>Members whose values change on every run; the snapshot pins only their presence.</summary>
     private static readonly HashSet<string> VolatileMembers = new(StringComparer.Ordinal) { "traceId", "durationMs" };
 
-    // Relaxed escaping keeps snapshots readable ("+00:00", "application/problem+json").
-    // The files are only ever read by people and by this helper, never embedded in HTML.
+    // Relaxed escaping keeps snapshots readable; the files are never embedded in HTML.
     private static readonly JsonSerializerOptions Indented = new()
     {
         WriteIndented = true,

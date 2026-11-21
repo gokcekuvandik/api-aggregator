@@ -5,12 +5,12 @@ using Aggregator.Application.Sources;
 
 namespace Aggregator.Api.IntegrationTests.Endpoints;
 
-/// <summary>ADR-0002: <c>GET /api/v1/aggregation</c> contract and status codes.</summary>
+/// <summary><c>GET /api/v1/aggregation</c> contract and status codes.</summary>
 public sealed class AggregationEndpointTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
     private const string Url = ApiRoutes.Aggregation;
 
-    /// <summary>ADR-0014 decision table: source states → HTTP status.</summary>
+    /// <summary>Source states mapped to the HTTP status.</summary>
     public static TheoryData<string[], HttpStatusCode> DecisionTable => new()
     {
         { ["Success", "Success"], HttpStatusCode.OK },
@@ -106,7 +106,7 @@ public sealed class AggregationEndpointTests(AggregatorApiFactory factory) : ICl
         await response.ShouldBeJson(HttpStatusCode.OK);
     }
 
-    /// <summary>Invalid paging × environment: both the throwing and the non-throwing bad-request paths.</summary>
+    /// <summary>Invalid paging in both environments, which write bad-request errors differently.</summary>
     private static readonly string[] InvalidQueries = ["pageSize=0", "pageSize=101", "page=0", "page=-1", "pageSize=abc"];
     private static readonly string[] Environments = ["Development", "Production"];
 

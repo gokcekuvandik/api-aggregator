@@ -6,7 +6,7 @@ using Assembly = System.Reflection.Assembly;
 
 namespace Aggregator.ArchitectureTests;
 
-/// <summary>ADR-0001: dependencies point inward (Api → Infrastructure → Application → Domain).</summary>
+/// <summary>Dependencies point inward (Api → Infrastructure → Application → Domain).</summary>
 public sealed class LayerDependencyTests
 {
     private static readonly GivenTypesConjunctionWithDescription DomainLayer = Layer(DomainAssembly, "Domain layer");

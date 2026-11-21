@@ -1,6 +1,6 @@
 namespace Aggregator.Application.Paging;
 
-/// <summary>Offset paging over an in-memory result set (ADR-0002).</summary>
+/// <summary>Offset paging over an in-memory result set.</summary>
 public static class PageRequest
 {
     public const int DefaultPageSize = 20;

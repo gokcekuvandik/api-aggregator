@@ -6,10 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Aggregator.Api.Contracts;
 
 /// <summary>
-/// Query string of <c>GET /api/v1/aggregation</c>, bound with <c>[AsParameters]</c>.
-/// The explicit names keep the wire contract camelCase in binding, OpenAPI and validation errors.
-/// Defaults sit on the constructor parameters: <c>[AsParameters]</c> treats them as optional,
-/// while a property initialiser would leave the parameter required. ADR-0005 adds filters and sorting.
+/// Query string of <c>GET /api/v1/aggregation</c>.
+/// Defaults sit on the constructor parameters so binding treats them as optional.
 /// </summary>
 public sealed record AggregationRequest(
     [FromQuery(Name = "page")]

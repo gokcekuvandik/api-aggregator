@@ -2,7 +2,7 @@ using Aggregator.Application.Statistics;
 
 namespace Aggregator.Api.Contracts;
 
-/// <summary>Body of <c>GET /api/v1/statistics</c>. ADR-0008 adds the performance buckets.</summary>
+/// <summary>Body of <c>GET /api/v1/statistics</c>.</summary>
 public sealed record StatisticsResponse(IReadOnlyList<SourceStatisticsResponse> Items);
 
 public sealed record SourceStatisticsResponse(

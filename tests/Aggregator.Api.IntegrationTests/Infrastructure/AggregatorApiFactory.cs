@@ -21,10 +21,7 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
     public HttpClient CreateProductionClientWith(params IDataSource[] sources) =>
         CreateClientIn(Environments.Production, sources);
 
-    /// <summary>
-    /// Error paths differ by environment: Development throws on bad requests (ThrowOnBadRequest),
-    /// Production sets the status and lets UseStatusCodePages write the body.
-    /// </summary>
+    /// <summary>Development throws on bad requests, while Production lets status code pages write the body.</summary>
     public HttpClient CreateClientIn(string environment, params IDataSource[] sources) =>
         Create(services => ReplaceSources(services, sources), environment);
 

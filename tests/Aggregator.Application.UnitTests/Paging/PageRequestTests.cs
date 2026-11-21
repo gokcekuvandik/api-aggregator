@@ -2,7 +2,7 @@ using Aggregator.Application.Paging;
 
 namespace Aggregator.Application.UnitTests.Paging;
 
-/// <summary>ADR-0002: offset paging with a maximum page size. Boundaries per ADR-0014.</summary>
+/// <summary>Offset paging with a maximum page size.</summary>
 public sealed class PageRequestTests
 {
     private static readonly IReadOnlyList<int> FiveItems = [1, 2, 3, 4, 5];

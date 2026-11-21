@@ -2,10 +2,7 @@ using Aggregator.Domain.Items;
 
 namespace Aggregator.Application.Sources;
 
-/// <summary>
-/// Outcome of fetching one source (ADR-0006). The hierarchy is closed: only the four
-/// records below derive from it, so callers can switch over it exhaustively.
-/// </summary>
+/// <summary>Outcome of fetching one source; only the four records below derive from it.</summary>
 public abstract record SourceResult
 {
     private protected SourceResult(IReadOnlyList<AggregatedItem> items) => Items = items;

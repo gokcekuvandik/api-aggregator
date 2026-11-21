@@ -4,7 +4,7 @@ using Aggregator.Api.IntegrationTests.Infrastructure;
 
 namespace Aggregator.Api.IntegrationTests.Endpoints;
 
-/// <summary>ADR-0002 driver: the OpenAPI document describes the wire contract exactly.</summary>
+/// <summary>The OpenAPI document describes the wire contract exactly.</summary>
 public sealed class OpenApiContractTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
     [Fact]

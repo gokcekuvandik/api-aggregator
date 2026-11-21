@@ -5,7 +5,7 @@ using static ArchUnitNET.Fluent.ArchRuleDefinition;
 
 namespace Aggregator.ArchitectureTests;
 
-/// <summary>ADR-0002: one sealed <see cref="IEndpoint"/> per feature, talking only to Application ports.</summary>
+/// <summary>One sealed <see cref="IEndpoint"/> per feature, using only Application ports.</summary>
 public sealed class EndpointConventionTests
 {
     private const string EndpointsNamespacePattern = @"^Aggregator\.Api\.Endpoints(\..+)?$";

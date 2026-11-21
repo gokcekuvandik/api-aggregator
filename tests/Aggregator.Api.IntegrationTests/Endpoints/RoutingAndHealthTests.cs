@@ -3,7 +3,7 @@ using Aggregator.Api.IntegrationTests.Infrastructure;
 
 namespace Aggregator.Api.IntegrationTests.Endpoints;
 
-/// <summary>ADR-0002: URL-segment versioning, ProblemDetails for unknown routes, health probes.</summary>
+/// <summary>URL-segment versioning, ProblemDetails for unknown routes and health probes.</summary>
 public sealed class RoutingAndHealthTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
     [Fact]
