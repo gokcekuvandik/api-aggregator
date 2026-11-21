@@ -1,3 +1,4 @@
+using System.Net;
 using Aggregator.Api.IntegrationTests.Infrastructure;
 
 namespace Aggregator.Api.IntegrationTests.Snapshots;
@@ -38,6 +39,7 @@ public sealed class ContractSnapshotTests(AggregatorApiFactory factory) : IClass
 
         using var response = await client.GetAsync(ApiRoutes.Aggregation, TestContext.Current.CancellationToken);
 
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         await JsonSnapshot.MatchAsync(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
@@ -48,6 +50,7 @@ public sealed class ContractSnapshotTests(AggregatorApiFactory factory) : IClass
 
         using var response = await client.GetAsync($"{ApiRoutes.Aggregation}?pageSize=101", TestContext.Current.CancellationToken);
 
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         await JsonSnapshot.MatchAsync(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 }

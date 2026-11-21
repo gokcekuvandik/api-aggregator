@@ -106,15 +106,20 @@ public sealed class AggregationEndpointTests(AggregatorApiFactory factory) : ICl
         await response.ShouldBeJson(HttpStatusCode.OK);
     }
 
+    /// <summary>Invalid paging × environment: both the throwing and the non-throwing bad-request paths.</summary>
+    private static readonly string[] InvalidQueries = ["pageSize=0", "pageSize=101", "page=0", "page=-1", "pageSize=abc"];
+    private static readonly string[] Environments = ["Development", "Production"];
+
+    public static TheoryData<string, string> InvalidPaging => new(
+        from query in InvalidQueries
+        from environment in Environments
+        select (query, environment));
+
     [Theory]
-    [InlineData("pageSize=0")]
-    [InlineData("pageSize=101")]
-    [InlineData("page=0")]
-    [InlineData("page=-1")]
-    [InlineData("pageSize=abc")]
-    public async Task Get_ShouldReturn400Problem_WhenPagingIsInvalid(string query)
+    [MemberData(nameof(InvalidPaging))]
+    public async Task Get_ShouldReturn400Problem_WhenPagingIsInvalid(string query, string environment)
     {
-        using var client = factory.CreateClientWith(StubDataSource.InState("news", "Success"));
+        using var client = factory.CreateClientIn(environment, StubDataSource.InState("news", "Success"));
 
         using var response = await client.GetAsync($"{Url}?{query}", TestContext.Current.CancellationToken);
 

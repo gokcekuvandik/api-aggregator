@@ -9,7 +9,7 @@ internal static class ResponseAssertions
     {
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         response.StatusCode.ShouldBe(expected, body);
-        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/json");
+        response.Content.Headers.ContentType.ShouldNotBeNull(body).MediaType.ShouldBe("application/json");
         return JsonElement.Parse(body);
     }
 
@@ -18,7 +18,7 @@ internal static class ResponseAssertions
     {
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         response.StatusCode.ShouldBe(expected, body);
-        response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json", body);
+        response.Content.Headers.ContentType.ShouldNotBeNull(body).MediaType.ShouldBe("application/problem+json", body);
 
         var root = JsonElement.Parse(body);
         root.GetProperty("status").GetInt32().ShouldBe((int)expected);

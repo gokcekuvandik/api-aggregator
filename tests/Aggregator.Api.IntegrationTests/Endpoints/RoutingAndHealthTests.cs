@@ -17,10 +17,12 @@ public sealed class RoutingAndHealthTests(AggregatorApiFactory factory) : IClass
         response.Headers.GetValues("api-supported-versions").ShouldContain("1.0");
     }
 
-    [Fact]
-    public async Task Get_ShouldReturn404Problem_WhenVersionSegmentIsMissing()
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Production")]
+    public async Task Get_ShouldReturn404Problem_WhenVersionSegmentIsMissing(string environment)
     {
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClientIn(environment);
 
         using var response = await client.GetAsync("/api/sources", TestContext.Current.CancellationToken);
 
@@ -28,10 +30,12 @@ public sealed class RoutingAndHealthTests(AggregatorApiFactory factory) : IClass
     }
 
     /// <summary>With a URL-segment version, an unknown version is a URI that does not exist.</summary>
-    [Fact]
-    public async Task Get_ShouldReturn404Problem_WhenVersionIsUnsupported()
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Production")]
+    public async Task Get_ShouldReturn404Problem_WhenVersionIsUnsupported(string environment)
     {
-        using var client = factory.CreateClient();
+        using var client = factory.CreateClientIn(environment);
 
         using var response = await client.GetAsync("/api/v2/sources", TestContext.Current.CancellationToken);
 
