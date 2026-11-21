@@ -2,10 +2,15 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="WireMock.Net.Minimal" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Aggregator.Api\Aggregator.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\Fixtures\*.json" LinkBase="Fixtures" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

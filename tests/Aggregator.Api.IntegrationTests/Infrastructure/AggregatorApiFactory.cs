@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Logging;
+using Polly;
 
 namespace Aggregator.Api.IntegrationTests.Infrastructure;
 
@@ -30,10 +32,46 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
     public HttpClient CreateClientWithLogs(CapturingLoggerProvider logs, params IDataSource[] sources) =>
         Create(services => ReplaceSources(services, sources), Environments.Production, logs);
 
-    private HttpClient Create(Action<IServiceCollection> configure, string environment = "Development", CapturingLoggerProvider? logs = null) =>
+    /// <summary>
+    /// A Production client that keeps the real sources and applies <paramref name="settings"/>, typically base addresses of an <see cref="UpstreamServer"/>.
+    /// Retries wait 1 ms instead of seconds so fault tests stay fast; a Retry-After header still sets the delay.
+    /// </summary>
+    public HttpClient CreateClientWithUpstreams(
+        IReadOnlyDictionary<string, string?> settings,
+        Action<IServiceCollection>? configure = null,
+        CapturingLoggerProvider? logs = null) =>
+        Create(
+            services =>
+            {
+                services.ConfigureAll<HttpStandardResilienceOptions>(options =>
+                {
+                    options.Retry.Delay = TimeSpan.FromMilliseconds(1);
+                    options.Retry.BackoffType = DelayBackoffType.Constant;
+                    options.Retry.UseJitter = false;
+                });
+                configure?.Invoke(services);
+            },
+            Environments.Production,
+            logs,
+            settings);
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder) =>
+        builder.ConfigureTestServices(services =>
+            services.ConfigureHttpClientDefaults(http => http.AddHttpMessageHandler(() => new LoopbackOnlyHandler())));
+
+    private HttpClient Create(
+        Action<IServiceCollection> configure,
+        string environment = "Development",
+        CapturingLoggerProvider? logs = null,
+        IReadOnlyDictionary<string, string?>? settings = null) =>
         WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment(environment).ConfigureTestServices(configure);
+                foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
+                {
+                    builder.UseSetting(key, value);
+                }
+
                 if (logs is not null)
                 {
                     builder.ConfigureLogging(logging => logging.AddProvider(logs));

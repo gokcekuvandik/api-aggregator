@@ -1,0 +1,29 @@
+{
+  "total_count": 2,
+  "incomplete_results": false,
+  "items": [
+    {
+      "id": 17620347,
+      "node_id": "MDEwOlJlcG9zaXRvcnkxNzYyMDM0Nw==",
+      "name": "aspnetcore",
+      "full_name": "dotnet/aspnetcore",
+      "description": "ASP.NET Core is a cross-platform .NET framework for building modern cloud-based web applications.",
+      "html_url": "https://github.com/dotnet/aspnetcore",
+      "stargazers_count": 36000,
+      "language": "C#",
+      "updated_at": "2026-11-21T09:00:00Z",
+      "score": 1.0
+    },
+    {
+      "id": 2,
+      "name": "tiny",
+      "full_name": "someone/tiny",
+      "description": null,
+      "html_url": "https://github.com/someone/tiny",
+      "stargazers_count": 1,
+      "language": null,
+      "updated_at": "2026-11-01T00:00:00Z",
+      "score": 1.0
+    }
+  ]
+}

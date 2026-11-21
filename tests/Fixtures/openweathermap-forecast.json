@@ -1,0 +1,20 @@
+{
+  "cod": "200",
+  "message": 0,
+  "cnt": 2,
+  "list": [
+    {
+      "dt": 1795262400,
+      "main": { "temp": 12.3, "feels_like": 11.1, "temp_min": 11.8, "temp_max": 12.9, "humidity": 70 },
+      "weather": [ { "id": 800, "main": "Clear", "description": "clear sky", "icon": "01d" } ],
+      "dt_txt": "2026-11-21 12:00:00"
+    },
+    {
+      "dt": 1795273200,
+      "main": { "temp": 10.1, "feels_like": 9.0, "temp_min": 9.7, "temp_max": 10.4, "humidity": 75 },
+      "weather": [],
+      "dt_txt": "2026-11-21 15:00:00"
+    }
+  ],
+  "city": { "id": 264371, "name": "Athens", "country": "GR" }
+}

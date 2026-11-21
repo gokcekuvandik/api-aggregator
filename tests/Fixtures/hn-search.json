@@ -1,0 +1,35 @@
+{
+  "hits": [
+    {
+      "objectID": "4242",
+      "title": "Show HN: A .NET 11 aggregator",
+      "url": "https://example.com/aggregator",
+      "author": "alice",
+      "points": 120,
+      "story_text": null,
+      "created_at": "2026-11-21T08:30:00Z",
+      "created_at_i": 1795249800
+    },
+    {
+      "objectID": "4243",
+      "title": "Ask HN: How do you test HTTP clients?",
+      "url": null,
+      "author": "bob",
+      "points": 5,
+      "story_text": "<p>Question body</p>",
+      "created_at": "2026-11-20T22:00:00Z",
+      "created_at_i": 1795212000
+    },
+    {
+      "objectID": "4244",
+      "title": "",
+      "url": "https://example.com/untitled",
+      "author": "carol",
+      "points": 1,
+      "created_at": "2026-11-20T21:00:00Z"
+    }
+  ],
+  "nbHits": 3,
+  "page": 0,
+  "hitsPerPage": 20
+}

@@ -65,6 +65,52 @@ Every error is an RFC 9457 `application/problem+json` body with a `traceId` that
 
 `tests/Aggregator.Api.IntegrationTests/Snapshots` pins the OpenAPI document and the 200, 503 and 400 bodies as `*.verified.json`. A contract change fails the test and writes a `*.received.json` next to it: review it and rename it to accept, or run with `AGGREGATOR_UPDATE_SNAPSHOTS=1` to overwrite all snapshots.
 
+## Data sources
+
+Every source implements the `IDataSource` port (Application) and is registered in Infrastructure with one line. The default configuration needs no API keys; setting a key switches that category to its keyed provider. The source name stays the same either way.
+
+| Name | Without a key | With a key | Settings (`Sources:{name}:…`) |
+|---|---|---|---|
+| `weather` | Open-Meteo | OpenWeatherMap (`ApiKey`) | `Location`, `Latitude`, `Longitude`, `ForecastDays` (1–5) |
+| `news` | Hacker News (Algolia) | NewsAPI (`ApiKey`) | `Query`, `MaxItems` (1–100) |
+| `repositories` | GitHub, anonymous | GitHub (`Token`) | `Query`, `MaxItems` (1–100) |
+
+Every source also accepts `BaseAddress`: it must be https (plain http only for loopback hosts), end with `/`, and carry no credentials. Options are validated at startup, so a bad value stops the app with a message naming the setting. Responses larger than 4 MB are refused.
+
+Keys belong in user secrets, never in `appsettings*.json`:
+
+```bash
+dotnet user-secrets --project src/Aggregator.Api set "Sources:weather:ApiKey" "<openweathermap key>"
+dotnet user-secrets --project src/Aggregator.Api set "Sources:news:ApiKey" "<newsapi key>"
+dotnet user-secrets --project src/Aggregator.Api set "Sources:repositories:Token" "<github token>"
+```
+
+Being polite to upstreams:
+
+- The standard resilience handler retries transient failures and honours `Retry-After`.
+- GitHub requests send `If-None-Match`; a 304 reuses the stored body and does not count against the rate limit.
+- `X-RateLimit-Remaining` is logged at Debug, and at Warning once 5 or fewer requests are left. A 429 logs its `Retry-After`.
+- Outbound log entries redact query strings, so a key passed in the URL (OpenWeatherMap) is never logged. A test guards this.
+
+An upstream failure never becomes a 500. Each source turns HTTP errors, timeouts, an open circuit and unreadable payloads into a short `SourceFailure` message for `sources[]` and logs the details. Only bugs in our own code surface as 500.
+
+### How to add a data source
+
+1. Create a folder under `src/Aggregator.Infrastructure/Sources/<Category>/<Provider>/`.
+2. Add an options class that derives from `DataSourceOptions` and sets a default `BaseAddress` in its constructor. Use data annotations (`[Required]`, `[Range]`) for its other settings.
+3. Add the DTO records and a `JsonSerializerContext` with `RespectNullableAnnotations` and `RespectRequiredConstructorParameters`, so a changed payload fails as `SourceFailure` instead of producing empty items.
+4. Add an `internal sealed` class implementing `IDataSource` that builds the request and calls `SourceFetcher.FetchAsync` with a mapping to `AggregatedItem`. Use `SafeUri.Parse` for links.
+5. Register it in `SourceRegistration`:
+
+   ```csharp
+   services.AddDataSource<MySource, MySourceOptions>("my-source");
+   ```
+
+   That line binds `Sources:my-source`, validates it at startup, and creates the named `HttpClient` with resilience and rate-limit logging. Chain `.AddConditionalRequests()` if the upstream supports ETags.
+6. Add unit tests with MockHttp and a recorded fixture in `tests/Fixtures` (both test projects copy it), and add a WireMock case to `ExternalSourceTests`.
+
+`ExternalSourceTests.FourthSource_ShouldBeListedAndAggregated_WhenRegisteredWithOneLine` registers a fourth source from the test project with that single line and checks it appears in `/sources` and `/aggregation`.
+
 ## Cross-cutting concerns
 
 There is no mediator. Each concern has one home in an ASP.NET Core extension point, so endpoints contain business logic only. An architecture test fails if endpoint code uses `try` or depends on `Microsoft.Extensions.Logging`.
@@ -75,7 +121,8 @@ There is no mediator. Each concern has one home in an ASP.NET Core extension poi
 | Exception handling | `UseExceptionHandler` + `UnhandledExceptionHandler`: logs once with method and path, answers 500 ProblemDetails without details | done |
 | Validation | `AddValidation`: requests reach the handler already validated, 400 ProblemDetails otherwise | done |
 | Authentication, authorization, rate limiting | `UseAuthentication`, `UseAuthorization`, `UseRateLimiter` on the route group | planned |
-| Outbound statistics, logs, resilience | `DelegatingHandler` chain on each typed `HttpClient` | planned |
+| Outbound resilience, rate-limit logs, conditional requests | Standard resilience handler plus `DelegatingHandler`s on each source's named `HttpClient` | done |
+| Outbound statistics | `DelegatingHandler` on each source's named `HttpClient` | planned |
 | Caching and telemetry around sources | decorators over `IDataSource` | planned |
 
 ```mermaid
@@ -134,6 +181,11 @@ Checked on 2026-11-21 with SDK 11.0.100: restore and build produce no warnings.
 | Microsoft.AspNetCore.OpenApi | 11.0.0 | generates OpenAPI 3.2; built on Microsoft.OpenApi 3.x |
 | Asp.Versioning.Http / .Mvc.ApiExplorer | 10.2.3 / 10.2.1 | net10.0 builds, work on net11.0 |
 | Scalar.AspNetCore | 3.1.1 | reads the OpenAPI 3.2 document |
+| Microsoft.Extensions.Http / Options.ConfigurationExtensions | 11.0.0 | Infrastructure only; the web app uses the shared-framework copies |
+| Polly.Core | 8.7.0 | Infrastructure maps Polly's rejection exceptions to `SourceFailure`; 8.7.0 is what Aspire.Hosting 17 needs |
+| RichardSzalay.MockHttp | 7.1.0 | HTTP in unit tests |
+| WireMock.Net.Minimal | 2.32.0 | HTTP in integration tests |
+| Microsoft.Extensions.Diagnostics.Testing | 11.0.1 | `FakeLogger` |
 
 Not used, and why:
 
@@ -141,4 +193,6 @@ Not used, and why:
 - **Verify 33.7.1** fails the build (SponsorCheck SC021) unless the consuming project declares a maintenance-fee status. Snapshots use a small in-house helper (`JsonSnapshot`) instead.
 - **Microsoft.Extensions.DependencyInjection.Abstractions** is available on net11.0 without a reference (NU1510).
 
-Still to check when they are added: WireMock.Net, BenchmarkDotNet, Stryker.NET.
+- **WireMock.Net 2.32.0** (the full package) pulls in Microsoft.CodeAnalysis.CSharp 5.9 through its protobuf support, which conflicts with the 5.0 pin the architecture tests use (NU1109). `WireMock.Net.Minimal` has everything the tests need without it.
+
+Still to check when they are added: BenchmarkDotNet, Stryker.NET.

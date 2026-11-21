@@ -19,8 +19,11 @@ internal static class ArchitectureFixture
     /// <summary>Loaded so rules against logging types match something instead of passing vacuously.</summary>
     public static readonly Assembly LoggingAbstractionsAssembly = typeof(ILogger).Assembly;
 
+    /// <summary>Loaded so rules against HTTP types match something instead of passing vacuously.</summary>
+    public static readonly Assembly HttpAssembly = typeof(HttpClient).Assembly;
+
     public const string EndpointsNamespacePattern = @"^Aggregator\.Api\.Endpoints(\..+)?$";
 
     public static readonly Architecture Architecture =
-        new ArchLoader().LoadAssemblies(DomainAssembly, ApplicationAssembly, InfrastructureAssembly, ApiAssembly, LoggingAbstractionsAssembly).Build();
+        new ArchLoader().LoadAssemblies(DomainAssembly, ApplicationAssembly, InfrastructureAssembly, ApiAssembly, LoggingAbstractionsAssembly, HttpAssembly).Build();
 }
