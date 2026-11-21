@@ -8,8 +8,6 @@ namespace Aggregator.ArchitectureTests;
 /// <summary>One sealed <see cref="IEndpoint"/> per feature, using only Application ports.</summary>
 public sealed class EndpointConventionTests
 {
-    private const string EndpointsNamespacePattern = @"^Aggregator\.Api\.Endpoints(\..+)?$";
-
     [Fact]
     public void Endpoints_ShouldBeSealed_WhenTheyImplementIEndpoint() =>
         Classes().That().ImplementInterface(typeof(IEndpoint))

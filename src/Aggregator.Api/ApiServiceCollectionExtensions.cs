@@ -1,15 +1,27 @@
 using System.Text.Json.Serialization;
 using Aggregator.Api.Http;
 using Asp.Versioning;
+using Microsoft.AspNetCore.HttpLogging;
 
 namespace Aggregator.Api;
 
 internal static class ApiServiceCollectionExtensions
 {
-    /// <summary>Registers ProblemDetails, validation, API versioning and OpenAPI.</summary>
+    /// <summary>Registers ProblemDetails, exception handling, HTTP logging, validation, API versioning and OpenAPI.</summary>
     public static IServiceCollection AddApi(this IServiceCollection services)
     {
         services.AddProblemDetails(options => options.CustomizeProblemDetails = ValidationErrorKeys.CamelCase);
+        services.AddExceptionHandler<UnhandledExceptionHandler>();
+
+        // Query strings, headers and bodies are never logged, so tokens cannot leak through them.
+        services.AddHttpLogging(options =>
+        {
+            options.LoggingFields = HttpLoggingFields.RequestMethod
+                | HttpLoggingFields.RequestPath
+                | HttpLoggingFields.ResponseStatusCode
+                | HttpLoggingFields.Duration;
+            options.CombineLogs = true;
+        });
 
         services.AddValidation();
 

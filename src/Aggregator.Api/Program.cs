@@ -14,9 +14,14 @@ builder.Services
 
 var app = builder.Build();
 
-// The exception handler must stay first so later failures become ProblemDetails.
+// HTTP logging wraps the exception handler so a failed request is logged with its final 500 status.
+app.UseHttpLogging();
+
+// The exception handler comes before everything else that can fail, so those failures become ProblemDetails.
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+// Authentication, authorization and rate limiting go here, in that order (ADR-0010).
 
 app.MapOpenApi();
 if (app.Environment.IsDevelopment())

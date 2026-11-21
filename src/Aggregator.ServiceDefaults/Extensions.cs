@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -86,12 +87,14 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        app.MapHealthChecks(ReadinessEndpointPath);
+        app.MapHealthChecks(ReadinessEndpointPath)
+            .WithHttpLogging(HttpLoggingFields.None);
 
         app.MapHealthChecks(LivenessEndpointPath, new HealthCheckOptions
         {
             Predicate = r => r.Tags.Contains("live")
-        });
+        })
+            .WithHttpLogging(HttpLoggingFields.None);
 
         return app;
     }

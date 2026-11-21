@@ -65,6 +65,45 @@ Every error is an RFC 9457 `application/problem+json` body with a `traceId` that
 
 `tests/Aggregator.Api.IntegrationTests/Snapshots` pins the OpenAPI document and the 200, 503 and 400 bodies as `*.verified.json`. A contract change fails the test and writes a `*.received.json` next to it: review it and rename it to accept, or run with `AGGREGATOR_UPDATE_SNAPSHOTS=1` to overwrite all snapshots.
 
+## Cross-cutting concerns
+
+There is no mediator. Each concern has one home in an ASP.NET Core extension point, so endpoints contain business logic only. An architecture test fails if endpoint code uses `try` or depends on `Microsoft.Extensions.Logging`.
+
+| Concern | Where it lives | Status |
+|---|---|---|
+| Access log | `UseHttpLogging`: method, path, status and duration in one entry. Query strings, headers and bodies are never logged, so tokens cannot leak. Health probes opt out where they are mapped (`WithHttpLogging(None)`). | done |
+| Exception handling | `UseExceptionHandler` + `UnhandledExceptionHandler`: logs once with method and path, answers 500 ProblemDetails without details | done |
+| Validation | `AddValidation`: requests reach the handler already validated, 400 ProblemDetails otherwise | done |
+| Authentication, authorization, rate limiting | `UseAuthentication`, `UseAuthorization`, `UseRateLimiter` on the route group | planned |
+| Outbound statistics, logs, resilience | `DelegatingHandler` chain on each typed `HttpClient` | planned |
+| Caching and telemetry around sources | decorators over `IDataSource` | planned |
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant L as HttpLogging
+    participant E as ExceptionHandler
+    participant A as Auth + RateLimiter (planned)
+    participant V as Validation filter
+    participant H as Endpoint
+    participant S as IDataSource decorators (planned)
+    participant D as DelegatingHandlers (planned)
+    C->>L: request
+    L->>E: next
+    E->>A: next
+    A->>V: next
+    V->>H: validated request
+    H->>S: FetchAsync
+    S->>D: HTTP call
+    D-->>S: response
+    S-->>H: SourceResult
+    H-->>E: 200 / 503
+    E-->>L: or 500 ProblemDetails on an exception
+    L-->>C: logs final status
+```
+
+HTTP logging is outermost on purpose. Inside the exception handler it would log a failed request as 200.
+
 ## Build and run
 
 Requires the .NET 11 SDK (pinned in `global.json`).
