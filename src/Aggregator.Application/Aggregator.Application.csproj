@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aggregator.Domain\Aggregator.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

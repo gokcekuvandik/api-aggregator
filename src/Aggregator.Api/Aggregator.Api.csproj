@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Aggregator.Domain\Aggregator.Domain.csproj" />
+    <ProjectReference Include="..\Aggregator.Application\Aggregator.Application.csproj" />
+    <ProjectReference Include="..\Aggregator.Infrastructure\Aggregator.Infrastructure.csproj" />
+    <ProjectReference Include="..\Aggregator.ServiceDefaults\Aggregator.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

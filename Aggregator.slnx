@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/Aggregator.Api.IntegrationTests/Aggregator.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Aggregator.Application.UnitTests/Aggregator.Application.UnitTests.csproj" />
+    <Project Path="tests/Aggregator.ArchitectureTests/Aggregator.ArchitectureTests.csproj" />
+    <Project Path="tests/Aggregator.Domain.UnitTests/Aggregator.Domain.UnitTests.csproj" />
+    <Project Path="tests/Aggregator.Infrastructure.UnitTests/Aggregator.Infrastructure.UnitTests.csproj" />
+  </Folder>
+  <Project Path="src/Aggregator.Api/Aggregator.Api.csproj" />
+  <Project Path="src/Aggregator.AppHost/Aggregator.AppHost.csproj" />
+  <Project Path="src/Aggregator.Application/Aggregator.Application.csproj" />
+  <Project Path="src/Aggregator.Domain/Aggregator.Domain.csproj" />
+  <Project Path="src/Aggregator.Infrastructure/Aggregator.Infrastructure.csproj" />
+  <Project Path="src/Aggregator.ServiceDefaults/Aggregator.ServiceDefaults.csproj" />
+</Solution>
