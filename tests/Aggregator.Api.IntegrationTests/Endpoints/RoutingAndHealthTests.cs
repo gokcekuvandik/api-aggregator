@@ -27,14 +27,15 @@ public sealed class RoutingAndHealthTests(AggregatorApiFactory factory) : IClass
         await response.ShouldBeProblem(HttpStatusCode.NotFound);
     }
 
+    /// <summary>With a URL-segment version, an unknown version is a URI that does not exist.</summary>
     [Fact]
-    public async Task Get_ShouldReturn400Problem_WhenVersionIsUnsupported()
+    public async Task Get_ShouldReturn404Problem_WhenVersionIsUnsupported()
     {
         using var client = factory.CreateClient();
 
         using var response = await client.GetAsync("/api/v2/sources", TestContext.Current.CancellationToken);
 
-        await response.ShouldBeProblem(HttpStatusCode.BadRequest);
+        await response.ShouldBeProblem(HttpStatusCode.NotFound);
     }
 
     [Theory]

@@ -10,7 +10,7 @@ internal static class ResponseAssertions
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         response.StatusCode.ShouldBe(expected, body);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/json");
-        return JsonDocument.Parse(body).RootElement.Clone();
+        return JsonElement.Parse(body);
     }
 
     /// <summary>Asserts an RFC 9457 body that carries a trace id (ADR-0002).</summary>
@@ -20,7 +20,7 @@ internal static class ResponseAssertions
         response.StatusCode.ShouldBe(expected, body);
         response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json", body);
 
-        var root = JsonDocument.Parse(body).RootElement.Clone();
+        var root = JsonElement.Parse(body);
         root.GetProperty("status").GetInt32().ShouldBe((int)expected);
         root.GetProperty("title").GetString().ShouldNotBeNullOrWhiteSpace();
         root.GetProperty("traceId").GetString().ShouldNotBeNullOrWhiteSpace();
