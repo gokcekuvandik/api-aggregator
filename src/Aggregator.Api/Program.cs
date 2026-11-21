@@ -1,7 +1,9 @@
 using Aggregator.Api;
 using Aggregator.Api.Endpoints;
 using Aggregator.Application;
+using Aggregator.Application.Sources;
 using Aggregator.Infrastructure;
+using OpenTelemetry.Metrics;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +13,7 @@ builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration)
     .AddApi();
+builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(SourceCacheMetrics.MeterName));
 
 var app = builder.Build();
 

@@ -14,8 +14,8 @@ public abstract record SourceResult
 /// <summary>The source answered live.</summary>
 public sealed record SourceSuccess(IReadOnlyList<AggregatedItem> Items) : SourceResult(Items);
 
-/// <summary>The answer came from a fresh cache entry.</summary>
-public sealed record SourceCached(IReadOnlyList<AggregatedItem> Items) : SourceResult(Items);
+/// <summary>The answer came from a fresh cache entry stored <paramref name="Age"/> ago, live from the primary or from the named secondary provider.</summary>
+public sealed record SourceCached(IReadOnlyList<AggregatedItem> Items, TimeSpan Age, string? Provider = null) : SourceResult(Items);
 
 /// <summary>
 /// The primary provider failed. The items come from the named secondary provider (age zero),

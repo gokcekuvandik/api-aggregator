@@ -9,7 +9,7 @@ namespace Aggregator.Application.UnitTests.Aggregation;
 public sealed class AggregationResultTests
 {
     private static readonly SourceResult Success = new SourceSuccess(TestItems.Many(1));
-    private static readonly SourceResult Cached = new SourceCached(TestItems.Many(1));
+    private static readonly SourceResult Cached = new SourceCached(TestItems.Many(1), TimeSpan.FromMinutes(2));
     private static readonly SourceResult Fallback = new SourceFallback(TestItems.Many(1), Age: TimeSpan.FromMinutes(3));
     private static readonly SourceResult Failed = new SourceFailure("boom");
 

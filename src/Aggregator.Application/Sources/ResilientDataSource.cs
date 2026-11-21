@@ -25,18 +25,21 @@ public sealed record SourceProvider
 
 /// <summary>
 /// Tries the primary provider, then the secondary, then the last-known-good items, each fetch under its provider's timeout.
-/// Live answers are stored for later fallbacks. Caller cancellation and provider bugs still throw.
+/// Live answers are stored for later fallbacks and kept for the last-known-good lifetime. Caller cancellation and provider bugs still throw.
 /// </summary>
 public sealed class ResilientDataSource : IDataSource
 {
     private readonly ILastKnownGoodStore _store;
     private readonly TimeProvider _time;
+    private readonly TimeSpan _lastKnownGoodLifetime;
 
-    public ResilientDataSource(SourceProvider primary, SourceProvider? secondary, ILastKnownGoodStore store, TimeProvider time)
+    public ResilientDataSource(
+        SourceProvider primary, SourceProvider? secondary, ILastKnownGoodStore store, TimeProvider time, TimeSpan lastKnownGoodLifetime)
     {
         ArgumentNullException.ThrowIfNull(primary);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(time);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(lastKnownGoodLifetime, TimeSpan.Zero);
         if (secondary is not null && !secondary.Source.Categories.SequenceEqual(primary.Source.Categories, StringComparer.OrdinalIgnoreCase))
         {
             throw new ArgumentException($"The secondary provider '{secondary.Name}' must serve the same categories as '{primary.Name}'.", nameof(secondary));
@@ -46,6 +49,7 @@ public sealed class ResilientDataSource : IDataSource
         Secondary = secondary;
         _store = store;
         _time = time;
+        _lastKnownGoodLifetime = lastKnownGoodLifetime;
     }
 
     public SourceProvider Primary { get; }
@@ -56,15 +60,17 @@ public sealed class ResilientDataSource : IDataSource
 
     public IReadOnlyList<string> Categories => Primary.Source.Categories;
 
+    public SearchFields UsedFields => Primary.Source.UsedFields | (Secondary?.Source.UsedFields ?? SearchFields.None);
+
     public async Task<SourceResult> FetchAsync(AggregationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var key = LastKnownGoodKey.For(Name, query);
+        var key = SourceCacheKey.For(Name, UsedFields, query);
 
         var primary = await FetchWithinTimeoutAsync(Primary, query, cancellationToken);
         if (primary is not SourceFailure primaryFailure)
         {
-            Store(key, primary);
+            await StoreAsync(key, primary, cancellationToken);
             return primary;
         }
 
@@ -73,12 +79,12 @@ public sealed class ResilientDataSource : IDataSource
             var secondary = await FetchWithinTimeoutAsync(Secondary, query, cancellationToken);
             if (secondary is not SourceFailure)
             {
-                Store(key, secondary);
+                await StoreAsync(key, secondary, cancellationToken);
                 return new SourceFallback(secondary.Items, TimeSpan.Zero, Secondary.Name);
             }
         }
 
-        return _store.Find(key) is { } stored
+        return await _store.FindAsync(key, cancellationToken) is { } stored
             ? new SourceFallback(stored.Items, _time.GetUtcNow() - stored.StoredAt)
             : primaryFailure;
     }
@@ -97,5 +103,6 @@ public sealed class ResilientDataSource : IDataSource
         }
     }
 
-    private void Store(string key, SourceResult result) => _store.Save(key, new LastKnownGood(result.Items, _time.GetUtcNow()));
+    private ValueTask StoreAsync(string key, SourceResult result, CancellationToken cancellationToken) =>
+        _store.SaveAsync(key, new LastKnownGood(result.Items, _time.GetUtcNow()), _lastKnownGoodLifetime, cancellationToken);
 }

@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using Aggregator.Application.Sources;
+using Aggregator.Infrastructure.Sources.Caching;
 using Aggregator.Infrastructure.Sources.Http;
 using Aggregator.Infrastructure.Sources.Resilience;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +20,8 @@ public static class DataSourceServiceCollectionExtensions
 
     /// <summary>
     /// Registers a source's primary provider with its options (bound from <c>Sources:{name}</c>, validated at startup) and its named HTTP client.
-    /// The source is exposed as a <see cref="ResilientDataSource"/> that falls back to a secondary provider, if one is registered, and to last-known-good items.
+    /// The source is exposed as a <see cref="CachedDataSource"/>, unless its cache is disabled, over a <see cref="ResilientDataSource"/>, which falls back to a secondary provider, if one is registered, and to last-known-good items.
+    /// Cache settings come from <c>Sources:{name}:Cache</c>.
     /// The returned builder adds handlers that only this provider needs.
     /// </summary>
     public static IHttpClientBuilder AddDataSource<TSource, TOptions>(this IServiceCollection services, string name)
@@ -30,12 +32,22 @@ public static class DataSourceServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<ILastKnownGoodStore, InMemoryLastKnownGoodStore>();
-        services.AddSingleton<IDataSource>(provider => new ResilientDataSource(
-            Provider<TSource, TOptions>(provider, name, name),
-            provider.GetKeyedService<SourceProvider>(SecondaryClientName(name)),
-            provider.GetRequiredService<ILastKnownGoodStore>(),
-            provider.GetRequiredService<TimeProvider>()));
+        services.AddSourceCaching();
+        services.AddSourceCacheOptions(name, DataSourceOptions.SectionFor(name));
+        services.AddSingleton<IDataSource>(provider =>
+        {
+            var cache = provider.GetRequiredService<IOptionsMonitor<SourceCacheOptions>>().Get(name);
+            var time = provider.GetRequiredService<TimeProvider>();
+            var resilient = new ResilientDataSource(
+                Provider<TSource, TOptions>(provider, name, name),
+                provider.GetKeyedService<SourceProvider>(SecondaryClientName(name)),
+                provider.GetRequiredService<ILastKnownGoodStore>(),
+                time,
+                cache.LastKnownGoodTtl);
+            return cache.Enabled
+                ? new CachedDataSource(resilient, provider.GetRequiredService<ISourceCache>(), cache.Ttl, time, provider.GetRequiredService<SourceCacheMetrics>())
+                : resilient;
+        });
 
         return services.AddProvider<TSource, TOptions>(name, DataSourceOptions.SectionFor(name), clientName: name);
     }

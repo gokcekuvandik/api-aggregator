@@ -40,7 +40,15 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
         IReadOnlyDictionary<string, string?> settings,
         Action<IServiceCollection>? configure = null,
         CapturingLoggerProvider? logs = null) =>
-        Create(
+        CreateWithUpstreams(settings, configure, logs).Client;
+
+    /// <summary>Like <see cref="CreateClientWithUpstreams"/>, and also returns the host's services, such as its meter factory.</summary>
+    public (HttpClient Client, IServiceProvider Services) CreateWithUpstreams(
+        IReadOnlyDictionary<string, string?> settings,
+        Action<IServiceCollection>? configure = null,
+        CapturingLoggerProvider? logs = null)
+    {
+        var host = Host(
             services =>
             {
                 services.ConfigureAll<HttpStandardResilienceOptions>(options =>
@@ -54,6 +62,8 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
             Environments.Production,
             logs,
             settings);
+        return (host.CreateClient(), host.Services);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>
         builder.ConfigureTestServices(services =>
@@ -64,6 +74,13 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
         string environment = "Development",
         CapturingLoggerProvider? logs = null,
         IReadOnlyDictionary<string, string?>? settings = null) =>
+        Host(configure, environment, logs, settings).CreateClient();
+
+    private WebApplicationFactory<Program> Host(
+        Action<IServiceCollection> configure,
+        string environment,
+        CapturingLoggerProvider? logs,
+        IReadOnlyDictionary<string, string?>? settings) =>
         WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment(environment).ConfigureTestServices(configure);
@@ -76,8 +93,7 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
                 {
                     builder.ConfigureLogging(logging => logging.AddProvider(logs));
                 }
-            })
-            .CreateClient();
+            });
 
     private static void ReplaceSources(IServiceCollection services, IDataSource[] sources)
     {

@@ -31,6 +31,8 @@ internal sealed class OpenWeatherMapSource(SourceFetcher fetcher, IOptions<OpenW
 
     public IReadOnlyList<string> Categories { get; } = [SourceNames.Weather];
 
+    public SearchFields UsedFields => SearchFields.City | SearchFields.From;
+
     public Task<SourceResult> FetchAsync(AggregationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);

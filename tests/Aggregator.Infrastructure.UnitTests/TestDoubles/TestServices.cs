@@ -16,4 +16,13 @@ internal static class TestServices
         services.AddLogging();
         return services;
     }
+
+    /// <summary>Builds a provider with everything <c>AddInfrastructure</c> registers, then any test overrides.</summary>
+    public static ServiceProvider BuildInfrastructure(Dictionary<string, string?> settings, Action<IServiceCollection>? configure = null)
+    {
+        var services = Create(settings, out var configuration);
+        services.AddInfrastructure(configuration);
+        configure?.Invoke(services);
+        return services.BuildServiceProvider();
+    }
 }

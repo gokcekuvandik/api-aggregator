@@ -14,6 +14,14 @@ public sealed class UpstreamServer : IAsyncLifetime
     public const string GitHubPath = "/search/repositories";
     public const string GeocodingPath = "/v1/search";
 
+    /// <summary>Each source with the path of the provider that answers it by default.</summary>
+    public static readonly (string Source, string Path)[] Upstreams =
+    [
+        ("weather", OpenMeteoPath),
+        ("news", HackerNewsPath),
+        ("repositories", GitHubPath),
+    ];
+
     /// <summary>Mappings at this priority win over the defaults that <see cref="StubKeylessSources"/> adds.</summary>
     public const int OverridePriority = 1;
 
@@ -37,6 +45,18 @@ public sealed class UpstreamServer : IAsyncLifetime
         ["Sources:news:ApiKey"] = string.Empty,
         ["Sources:repositories:Token"] = string.Empty,
     };
+
+    /// <summary>Like <see cref="Settings"/>, but with the source cache off, for tests of what happens below it on every call.</summary>
+    public Dictionary<string, string?> SettingsWithoutCache()
+    {
+        var settings = Settings();
+        foreach (var (source, _) in Upstreams)
+        {
+            settings[$"Sources:{source}:Cache:Enabled"] = "false";
+        }
+
+        return settings;
+    }
 
     public void StubKeylessSources()
     {

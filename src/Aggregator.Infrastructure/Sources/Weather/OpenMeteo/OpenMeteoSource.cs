@@ -28,6 +28,8 @@ internal sealed class OpenMeteoSource(SourceFetcher fetcher, IOptions<OpenMeteoO
 
     public IReadOnlyList<string> Categories { get; } = [SourceNames.Weather];
 
+    public SearchFields UsedFields => SearchFields.City | SearchFields.From;
+
     public async Task<SourceResult> FetchAsync(AggregationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);

@@ -6,6 +6,8 @@ using Aggregator.Infrastructure.Sources;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 
+using static Aggregator.Api.IntegrationTests.Infrastructure.AggregationBody;
+
 namespace Aggregator.Api.IntegrationTests.Sources;
 
 /// <summary>The real adapters, end to end through the API, against recorded upstream payloads.</summary>
@@ -106,7 +108,7 @@ public sealed class ExternalSourceTests : IClassFixture<AggregatorApiFactory>, I
         _upstream.Server.Given(Request.Create().WithPath(UpstreamServer.GitHubPath).WithHeader("If-None-Match", "\"gh-1\"").UsingGet())
             .AtPriority(UpstreamServer.OverridePriority)
             .RespondWith(Response.Create().WithStatusCode(304).WithHeader("ETag", "\"gh-1\""));
-        using var client = _factory.CreateClientWithUpstreams(_upstream.Settings());
+        using var client = _factory.CreateClientWithUpstreams(_upstream.SettingsWithoutCache());
 
         var first = await GetAggregationAsync(client);
         var second = await GetAggregationAsync(client);
@@ -197,13 +199,4 @@ public sealed class ExternalSourceTests : IClassFixture<AggregatorApiFactory>, I
         using var response = await client.GetAsync(ApiRoutes.Aggregation, TestContext.Current.CancellationToken);
         return await response.ShouldBeJson(HttpStatusCode.OK);
     }
-
-    private static JsonElement Source(JsonElement body, string name) =>
-        body.GetProperty("sources").EnumerateArray().Single(s => s.GetProperty("name").GetString() == name);
-
-    private static Dictionary<string, string?> Statuses(JsonElement body) =>
-        body.GetProperty("sources").EnumerateArray().ToDictionary(s => s.GetProperty("name").GetString()!, s => s.GetProperty("status").GetString());
-
-    private static List<string?> Ids(JsonElement body) =>
-        [.. body.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString())];
 }
