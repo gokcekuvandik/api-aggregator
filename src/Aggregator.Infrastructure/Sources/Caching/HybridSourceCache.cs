@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Aggregator.Application.Sources;
 using Microsoft.Extensions.Caching.Hybrid;
 
@@ -17,12 +18,15 @@ internal sealed class HybridSourceCache(HybridCache cache) : ISourceCache
         ArgumentNullException.ThrowIfNull(toEntry);
 
         SourceResult? fetched = null;
+        var caller = Activity.Current;
         try
         {
             var entry = await cache.GetOrCreateAsync(
                 key,
                 async token =>
                 {
+                    // HybridCache runs the factory without the caller's execution context, which would orphan the upstream spans.
+                    Activity.Current ??= caller;
                     fetched = await fetch(token);
                     return toEntry(fetched) ?? throw new UnstoredResultException(fetched);
                 },

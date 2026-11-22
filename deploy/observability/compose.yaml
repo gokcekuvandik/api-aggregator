@@ -1,0 +1,23 @@
+# Optional local Grafana view of the Aggregator's telemetry. The API never depends on it.
+#
+#   docker compose -f deploy/observability/compose.yaml --profile observability up -d
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 dotnet run --project src/Aggregator.Api
+#
+# Grafana opens on http://localhost:3000 with the Aggregator dashboard as its home page.
+# The image signs every visitor in as an anonymous admin, so the ports are bound to this machine only.
+name: aggregator-observability
+
+services:
+  lgtm:
+    image: grafana/otel-lgtm:0.38.1
+    profiles: [observability]
+    ports:
+      - "127.0.0.1:3000:3000" # Grafana
+      - "127.0.0.1:4317:4317" # OTLP gRPC
+      - "127.0.0.1:4318:4318" # OTLP HTTP
+    environment:
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/grafana/conf/provisioning/dashboards/aggregator/aggregator.json
+    volumes:
+      - ./grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/aggregator.yaml:ro
+      - ./grafana/dashboards/aggregator.json:/otel-lgtm/grafana/conf/provisioning/dashboards/aggregator/aggregator.json:ro
+      - ./grafana/alerting/aggregator-alerts.yaml:/otel-lgtm/grafana/conf/provisioning/alerting/aggregator-alerts.yaml:ro

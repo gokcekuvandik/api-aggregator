@@ -16,4 +16,21 @@ internal static class TestSources
         source.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns(result);
         return source;
     }
+
+    /// <summary>A source whose fetch only ends when its token is cancelled.</summary>
+    public static IDataSource Hanging(string name)
+    {
+        var source = Substitute.For<IDataSource>();
+        source.Name.Returns(name);
+        source.Categories.Returns([name]);
+        source.UsedFields.Returns(SearchFields.All);
+        source.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns(call => WaitForCancellationAsync(call.Arg<CancellationToken>()));
+        return source;
+    }
+
+    private static async Task<SourceResult> WaitForCancellationAsync(CancellationToken cancellationToken)
+    {
+        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        throw new InvalidOperationException("Unreachable: the delay only ends by cancellation.");
+    }
 }

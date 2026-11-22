@@ -197,6 +197,55 @@ sequenceDiagram
 
 HTTP logging is outermost on purpose. Inside the exception handler it would log a failed request as 200.
 
+## Observability
+
+All three OpenTelemetry signals are set up once in `Aggregator.ServiceDefaults` and exported over OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. The resource carries `service.name` (the application name unless `OTEL_SERVICE_NAME` overrides it) and `service.version` (the MinVer version from the git tag). ASP.NET Core, HttpClient, runtime, Kestrel and Polly instrumentation is on, plus the Aggregator's own meter and activity source, both named `Aggregator`.
+
+### Metrics
+
+| Instrument | Type | Unit | Tags |
+|---|---|---|---|
+| `aggregator.source.request.duration` | histogram | s | `source`, `provider`, `outcome` |
+| `aggregator.source.requests` | counter | `{request}` | `source`, `provider`, `outcome` (success, failure, cancelled, rejected) |
+| `aggregator.cache.lookups` | counter | `{lookup}` | `source`, `result` (hit, miss, stale) |
+| `aggregator.fallback.activations` | counter | `{activation}` | `source`, `result` (secondary, last_known_good, none) |
+| `aggregator.aggregation.duration` | histogram | s | `mode` (page, stream), `outcome` (complete, degraded, failed, cancelled, error) |
+| `aggregator.source.anomalies` | counter | `{anomaly}` | `source`, `provider` |
+| `aggregator.source.circuit_state` | gauge | `{state}` | `source`, `provider`; 0 closed, 1 half-open, 2 open |
+
+`provider` is `primary` or the secondary's name. Tags are low cardinality only: the caller's search text, city and other query values never become tags, span attributes or span names. Tests cover this. Outgoing URL query strings, where the OpenWeatherMap key travels, are redacted by .NET's HttpClient telemetry. Never set `DOTNET_SYSTEM_NET_HTTP_DISABLEURIREDACTION`; a test fails if the key reaches a span or a log.
+
+### Traces
+
+Every aggregation is one `aggregate` span (tags `aggregator.mode`, `aggregator.source_count`, `aggregator.outcome`) under the ASP.NET Core server span. Each source gets an `aggregate.source` child (tags `aggregator.source`, `aggregator.result`), and the HttpClient spans of that source's upstream calls sit beneath it, including on a cache miss. A fallback adds an `aggregator.fallback` event to the source span, and a circuit breaker that opens adds an `aggregator.circuit.opened` event to the span current at that moment. Logs written during a request carry its `TraceId` and `SpanId`.
+
+### Where to look
+
+- **Aspire dashboard (default).** `dotnet run --project src/Aggregator.AppHost` starts the API and the dashboard, which shows traces, metrics and structured logs with no further setup.
+- **Grafana (optional).** `deploy/observability/compose.yaml` runs `grafana/otel-lgtm` (Grafana, Prometheus, Tempo, Loki and a collector) behind the `observability` profile. It provisions an *Aggregator* dashboard and an alert rule mirroring the anomaly rule (5-minute average above 1.5× the hourly average over at least 10 requests). The image signs everyone in as an anonymous admin, so its ports are bound to localhost.
+
+  ```bash
+  docker compose -f deploy/observability/compose.yaml --profile observability up -d
+  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 dotnet run --project src/Aggregator.Api
+  # Grafana: http://localhost:3000
+  ```
+
+### Sampling
+
+Traces are always on by default, which suits local runs. Elsewhere set the standard variables, for example `OTEL_TRACES_SAMPLER=parentbased_traceidratio` and `OTEL_TRACES_SAMPLER_ARG=0.1`. Metrics are never sampled, so dashboards and alerts stay exact.
+
+### Screenshots
+
+One aggregation in the Aspire dashboard (taken with the dashboard's anonymous mode, hence the banner):
+
+![Aspire trace of one aggregation](deploy/observability/screenshots/aspire-trace.png)
+
+The provisioned Grafana dashboard and the same kind of trace in Tempo:
+
+![Grafana Aggregator dashboard](deploy/observability/screenshots/grafana-dashboard.png)
+
+![Grafana Tempo trace of one aggregation](deploy/observability/screenshots/grafana-trace.png)
+
 ## Build and run
 
 Requires the .NET 11 SDK (pinned in `global.json`).

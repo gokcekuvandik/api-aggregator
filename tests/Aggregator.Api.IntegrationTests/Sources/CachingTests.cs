@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.Json;
 using Aggregator.Api.IntegrationTests.Infrastructure;
 using Aggregator.Application.Sources;
+using Aggregator.Application.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using WireMock.RequestBuilders;
@@ -121,7 +122,7 @@ public sealed class CachingTests : IClassFixture<AggregatorApiFactory>, IClassFi
         var (client, services) = _factory.CreateWithUpstreams(_upstream.Settings());
         using (client)
         {
-            using var lookups = new MetricCollector<long>(services.GetRequiredService<IMeterFactory>(), SourceCacheMetrics.MeterName, SourceCacheMetrics.LookupsName);
+            using var lookups = new MetricCollector<long>(services.GetRequiredService<IMeterFactory>(), AggregatorDiagnostics.Name, SourceCacheMetrics.LookupsName);
 
             await GetAsync(client, "?sources=repositories");
             await GetAsync(client, "?sources=repositories");

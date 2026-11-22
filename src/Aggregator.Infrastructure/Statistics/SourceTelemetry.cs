@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
+using Aggregator.Application.Telemetry;
 using Aggregator.Domain.Statistics;
 
 namespace Aggregator.Infrastructure.Statistics;
@@ -30,7 +31,7 @@ internal sealed class SourceTelemetry : ISourceTelemetry
         ArgumentNullException.ThrowIfNull(thresholds);
 
         _store = store;
-        var meter = meterFactory.Create(SourceCacheMetrics.MeterName);
+        var meter = meterFactory.Create(AggregatorDiagnostics.Name);
         _duration = meter.CreateHistogram(
             DurationName,
             unit: "s",

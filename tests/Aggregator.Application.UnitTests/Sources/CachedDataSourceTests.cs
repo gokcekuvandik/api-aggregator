@@ -2,6 +2,7 @@ using Aggregator.Application.Aggregation;
 using Aggregator.Application.Aggregation.Sorting;
 using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
+using Aggregator.Application.Telemetry;
 using Aggregator.Application.UnitTests.TestData;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using NSubstitute;
@@ -25,7 +26,7 @@ public sealed class CachedDataSourceTests : IDisposable
     public CachedDataSourceTests()
     {
         _cache = new FakeSourceCache(_clock);
-        _lookups = new MetricCollector<long>(_meters, SourceCacheMetrics.MeterName, SourceCacheMetrics.LookupsName);
+        _lookups = new MetricCollector<long>(_meters, AggregatorDiagnostics.Name, SourceCacheMetrics.LookupsName);
     }
 
     public enum Inner

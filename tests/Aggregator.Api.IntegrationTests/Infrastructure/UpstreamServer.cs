@@ -76,6 +76,10 @@ public sealed class UpstreamServer : IAsyncLifetime
         Server.Given(Request.Create().WithPath(path).UsingGet()).AtPriority(priority).RespondWith(response);
     }
 
+    /// <summary>Answers every GET on <paramref name="path"/> with <paramref name="status"/>, ahead of the default stubs.</summary>
+    public void StubStatus(string path, int status, int priority = OverridePriority) =>
+        Server.Given(Request.Create().WithPath(path).UsingGet()).AtPriority(priority).RespondWith(Response.Create().WithStatusCode(status));
+
     public static IResponseBuilder JsonResponse(string fixture) =>
         Response.Create().WithStatusCode(200).WithHeader("Content-Type", "application/json").WithBody(Fixture(fixture));
 

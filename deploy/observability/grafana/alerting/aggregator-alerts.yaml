@@ -1,0 +1,48 @@
+# Mirrors the anomaly rule of the API: an external API whose 5-minute average is more than 1.5x its usual average,
+# over at least 10 requests. Prometheus keeps no lifetime totals, so "usual" is the last hour here.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: aggregator
+    folder: Aggregator
+    interval: 1m
+    rules:
+      - uid: aggregator-source-slow
+        title: External API slower than usual
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                (
+                  sum by (source, provider) (rate(aggregator_source_request_duration_seconds_sum[5m]))
+                  / sum by (source, provider) (rate(aggregator_source_request_duration_seconds_count[5m]))
+                )
+                /
+                (
+                  sum by (source, provider) (rate(aggregator_source_request_duration_seconds_sum[1h]))
+                  / sum by (source, provider) (rate(aggregator_source_request_duration_seconds_count[1h]))
+                )
+                and on (source, provider)
+                sum by (source, provider) (increase(aggregator_source_request_duration_seconds_count[5m])) >= 10
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [1.5] }
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.source }} ({{ $labels.provider }}) is slower than usual"
+          description: "The 5-minute average is {{ humanize $values.A.Value }}x the hourly average."
