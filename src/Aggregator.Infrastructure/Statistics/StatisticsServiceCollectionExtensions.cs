@@ -9,6 +9,10 @@ namespace Aggregator.Infrastructure.Statistics;
 internal static class StatisticsServiceCollectionExtensions
 {
     private const string BucketsSection = $"{StatisticsOptions.SectionName}:{nameof(StatisticsOptions.Buckets)}";
+    private const string AnomaliesSection = $"{StatisticsOptions.SectionName}:{nameof(StatisticsOptions.Anomalies)}";
+
+    /// <summary>A generous ceiling well inside the timer's own limit of about 49 days, so a typo fails validation instead of startup.</summary>
+    private static readonly TimeSpan MaxAnomalyInterval = TimeSpan.FromDays(1);
 
     /// <summary>Registers the statistics store, read through <see cref="IStatisticsReader"/> and written only through <see cref="ISourceTelemetry"/>.</summary>
     public static IServiceCollection AddStatistics(this IServiceCollection services)
@@ -21,6 +25,7 @@ internal static class StatisticsServiceCollectionExtensions
         services.AddOptions<StatisticsOptions>()
             .BindConfiguration(StatisticsOptions.SectionName)
             .Validate(options => AreValid(options.Buckets), $"{BucketsSection}: FastBelow must be positive and SlowAbove must not be shorter than it.")
+            .Validate(options => AreValid(options.Anomalies), $"{AnomaliesSection}: Interval must be positive and at most a day, Threshold positive, and MinSamples at least 1.")
             .ValidateOnStart();
         services.AddMetrics();
         services.TryAddSingleton(TimeProvider.System);
@@ -28,6 +33,7 @@ internal static class StatisticsServiceCollectionExtensions
         services.AddSingleton<StatisticsStore>();
         services.TryAddSingleton<IStatisticsReader>(provider => provider.GetRequiredService<StatisticsStore>());
         services.TryAddSingleton<ISourceTelemetry, SourceTelemetry>();
+        services.AddHostedService<AnomalyDetector>();
         return services;
     }
 
@@ -48,12 +54,18 @@ internal static class StatisticsServiceCollectionExtensions
         return builder.AddHttpMessageHandler(() => new AttemptCountingHandler());
     }
 
-    /// <summary>The thresholds' own constructor holds the rules, so validation tries it rather than restating them.</summary>
-    private static bool AreValid(StatisticsOptions.BucketOptions buckets)
+    private static bool AreValid(StatisticsOptions.BucketOptions buckets) => Constructs(() => new PerformanceThresholds(buckets.FastBelow, buckets.SlowAbove));
+
+    /// <summary>The rule's constructor holds the threshold and sample rules, so only the interval is checked here.</summary>
+    private static bool AreValid(StatisticsOptions.AnomalyOptions anomalies) =>
+        Constructs(() => anomalies.Rule) && anomalies.Interval > TimeSpan.Zero && anomalies.Interval <= MaxAnomalyInterval;
+
+    /// <summary>Settings are valid when the domain type they build accepts them, so validation tries the constructor rather than restating its rules.</summary>
+    private static bool Constructs(Func<object> create)
     {
         try
         {
-            _ = new PerformanceThresholds(buckets.FastBelow, buckets.SlowAbove);
+            _ = create();
             return true;
         }
         catch (ArgumentOutOfRangeException)
