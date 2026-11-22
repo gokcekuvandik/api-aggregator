@@ -358,6 +358,23 @@
           }
         }
       },
+      "BucketResponse": {
+        "required": [
+          "count",
+          "averageMs"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "averageMs": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -604,6 +621,33 @@
           }
         }
       },
+      "Performance": {
+        "enum": [
+          "Fast",
+          "Average",
+          "Slow",
+          null
+        ]
+      },
+      "PerformanceBucketsResponse": {
+        "required": [
+          "fast",
+          "average",
+          "slow"
+        ],
+        "type": "object",
+        "properties": {
+          "fast": {
+            "$ref": "#/components/schemas/BucketResponse"
+          },
+          "average": {
+            "$ref": "#/components/schemas/BucketResponse"
+          },
+          "slow": {
+            "$ref": "#/components/schemas/BucketResponse"
+          }
+        }
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -675,15 +719,27 @@
       "SourceStatisticsResponse": {
         "required": [
           "source",
+          "provider",
           "totalRequests",
           "averageMs",
-          "cacheHits",
-          "failures"
+          "performance",
+          "buckets",
+          "retries",
+          "failures",
+          "cancelled",
+          "rejected",
+          "cacheHits"
         ],
         "type": "object",
         "properties": {
           "source": {
             "type": "string"
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "totalRequests": {
             "type": "integer",
@@ -693,11 +749,36 @@
             "type": "number",
             "format": "double"
           },
-          "cacheHits": {
+          "performance": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Performance"
+              }
+            ]
+          },
+          "buckets": {
+            "$ref": "#/components/schemas/PerformanceBucketsResponse"
+          },
+          "retries": {
             "type": "integer",
             "format": "int64"
           },
           "failures": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cancelled": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cacheHits": {
             "type": "integer",
             "format": "int64"
           }

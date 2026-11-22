@@ -1,4 +1,5 @@
 using Aggregator.Application.Aggregation;
+using Aggregator.Application.Statistics;
 
 namespace Aggregator.Application.Sources;
 
@@ -12,20 +13,23 @@ public sealed class CachedDataSource : IDataSource
     private readonly TimeSpan _ttl;
     private readonly TimeProvider _time;
     private readonly SourceCacheMetrics _metrics;
+    private readonly ISourceTelemetry _telemetry;
 
-    public CachedDataSource(IDataSource inner, ISourceCache cache, TimeSpan ttl, TimeProvider time, SourceCacheMetrics metrics)
+    public CachedDataSource(IDataSource inner, ISourceCache cache, TimeSpan ttl, TimeProvider time, SourceCacheMetrics metrics, ISourceTelemetry telemetry)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(cache);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(ttl, TimeSpan.Zero);
         ArgumentNullException.ThrowIfNull(time);
         ArgumentNullException.ThrowIfNull(metrics);
+        ArgumentNullException.ThrowIfNull(telemetry);
 
         Inner = inner;
         _cache = cache;
         _ttl = ttl;
         _time = time;
         _metrics = metrics;
+        _telemetry = telemetry;
     }
 
     public IDataSource Inner { get; }
@@ -46,6 +50,7 @@ public sealed class CachedDataSource : IDataSource
         {
             case SourceCacheLookup.Hit { Entry: var entry }:
                 _metrics.Hit(Name);
+                _telemetry.RecordCacheHit(new UpstreamApi(Name, entry.Provider));
                 return new SourceCached(entry.Items, Age(entry.StoredAt), entry.Provider);
             case SourceCacheLookup.Fetched { Result: SourceFallback { Provider: null } stale }:
                 _metrics.Stale(Name);
