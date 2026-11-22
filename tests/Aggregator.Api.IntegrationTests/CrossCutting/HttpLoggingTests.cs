@@ -7,8 +7,10 @@ namespace Aggregator.Api.IntegrationTests.CrossCutting;
 public sealed class HttpLoggingTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
     private const string HttpLogCategory = "Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware";
-    private const string HeaderToken = "header-token-5f1c9e";
     private const string QueryToken = "query-token-7a2d4b";
+
+    /// <summary>A valid token, so the request also passes through the bearer handler's own logging.</summary>
+    private static readonly string HeaderToken = TestTokens.Create(TestTokens.AllScopes);
 
     [Fact]
     public async Task Request_ShouldWriteOneCombinedEntry_WhenEndpointIsCalled()

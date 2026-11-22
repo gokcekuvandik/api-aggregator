@@ -1,5 +1,6 @@
 using Aggregator.Api;
 using Aggregator.Api.Endpoints;
+using Aggregator.Api.Security;
 using Aggregator.Application;
 using Aggregator.Application.Sources;
 using Aggregator.Infrastructure;
@@ -12,7 +13,8 @@ builder.AddServiceDefaults();
 builder.Services
     .AddApplication()
     .AddInfrastructure(builder.Configuration)
-    .AddApi();
+    .AddApi()
+    .AddApiSecurity();
 builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(SourceCacheMetrics.MeterName));
 
 var app = builder.Build();
@@ -24,12 +26,16 @@ app.UseHttpLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-// Authentication, authorization and rate limiting go here, in that order (ADR-0010).
+app.UseAuthentication();
+app.UseAuthorization();
+
+// After authorization, so the limiter partitions by the validated subject and a rejected token never takes a token.
+app.UseRateLimiter();
 
 app.MapOpenApi();
 if (app.Environment.IsDevelopment())
 {
-    app.MapScalarApiReference();
+    app.MapScalarApiReference(options => options.AddPreferredSecuritySchemes([BearerSecurityTransformer.SchemeName]));
 }
 
 app.MapDefaultEndpoints();

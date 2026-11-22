@@ -1,3 +1,5 @@
+using Aggregator.Api.Security;
+
 namespace Aggregator.Api.Endpoints;
 
 internal static class EndpointRegistration
@@ -7,7 +9,12 @@ internal static class EndpointRegistration
     {
         var v1 = app.NewVersionedApi("Aggregator")
             .MapGroup("/api/v{version:apiVersion}")
-            .HasApiVersion(1, 0);
+            .HasApiVersion(1, 0)
+            .RequireAuthorization()
+            .RequireRateLimiting(CallerRateLimiting.PolicyName)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
         foreach (var endpoint in DiscoverEndpoints())
         {

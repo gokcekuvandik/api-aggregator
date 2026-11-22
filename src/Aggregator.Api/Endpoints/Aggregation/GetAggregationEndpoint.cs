@@ -1,4 +1,5 @@
 using Aggregator.Api.Contracts;
+using Aggregator.Api.Security;
 using Aggregator.Application.Aggregation;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -18,6 +19,7 @@ public sealed class GetAggregationEndpoint : IEndpoint
     public void Map(IEndpointRouteBuilder group) =>
         group.MapGet("/aggregation", HandleAsync)
             .WithName("GetAggregation")
+            .RequireAuthorization(ApiScopes.AggregationRead)
             .WithSummary("Aggregated items from all sources")
             .WithDescription(Description)
             .ProducesValidationProblem()

@@ -28,13 +28,14 @@ The dependency rule is enforced, not just documented: `Aggregator.ArchitectureTe
 
 Minimal APIs, versioned in the URL. Each feature is one sealed `IEndpoint` class under `Aggregator.Api.Endpoints`, found by an assembly scan, so a new endpoint needs no wiring.
 
-| Method and path | Purpose | Responses |
-|---|---|---|
-| `GET /api/v1/aggregation` | Items from the selected sources, filtered, sorted and paged | 200, 400, 503 |
-| `GET /api/v1/sources` | Registered sources and their categories | 200 |
-| `GET /api/v1/statistics` | Request statistics per source | 200 |
-| `GET /health/live`, `GET /health/ready` | Liveness and readiness probes (`Healthy` / `Unhealthy`) | 200, 503 |
-| `GET /openapi/v1.json` | OpenAPI 3.2 document; Scalar UI at `/scalar` in Development | 200 |
+| Method and path | Purpose | Scope | Responses |
+|---|---|---|---|
+| `GET /api/v1/aggregation` | Items from the selected sources, filtered, sorted and paged | `aggregation:read` | 200, 400, 401, 403, 429, 503 |
+| `GET /api/v1/aggregation/stream` | The same, streamed as server-sent events per source | `aggregation:read` | 200, 400, 401, 403, 429 |
+| `GET /api/v1/sources` | Registered sources and their categories | `aggregation:read` | 200, 401, 403, 429 |
+| `GET /api/v1/statistics` | Request statistics per source | `stats:read` | 200, 401, 403, 429 |
+| `GET /health/live`, `GET /health/ready` | Liveness and readiness probes (`Healthy` / `Unhealthy`) | anonymous | 200, 503 |
+| `GET /openapi/v1.json` | OpenAPI 3.2 document; Scalar UI at `/scalar` in Development | anonymous | 200 |
 
 An unknown version such as `/api/v2/…` is 404.
 
@@ -82,6 +83,29 @@ Ties are broken deterministically: by date for `relevance`, by relevance for `da
 ### Errors
 
 Every error is an RFC 9457 `application/problem+json` body with a `traceId` that matches the distributed trace. A 503 also carries `sources[]`. Validation errors (400) are keyed by the query parameter name (`pageSize`, `sources`, `category`, `from`, `sortBy`, …). A 500 never contains exception details.
+
+### Authentication and rate limiting
+
+Every `/api/v1` route needs a JWT bearer token. The issuer, audience, lifetime and signing key are all validated. Get a development token with one command. It writes the issuer and audiences to `appsettings.Development.json` (tracked in the repository) and the signing key to user secrets only:
+
+```bash
+dotnet user-jwts create --project src/Aggregator.Api --scope aggregation:read --scope stats:read
+```
+
+Paste the printed token into Scalar's **Authorize** dialog, or send it as `Authorization: Bearer <token>`. Leave out a `--scope` to see a 403. The app refuses to start when no audience, or neither an authority nor a signing key, is configured, and the message names this command.
+
+Validation settings live under `Authentication:Schemes:Bearer`, so a real identity provider is a configuration change, for example in a container:
+
+```bash
+Authentication__Schemes__Bearer__Authority=https://login.example.com/tenant/v2.0
+Authentication__Schemes__Bearer__ValidAudiences__0=api://aggregator
+```
+
+Scopes are read from `scope` or `scp`, as separate claims or one space-separated value. Claims keep their JWT names (`MapInboundClaims = false`).
+
+Each caller gets a token bucket, keyed by the JWT `sub`, or the client address when there is none: `RateLimiting:TokenLimit` (burst, default 20), `TokensPerPeriod` (10) and `ReplenishmentPeriod` (1 s). Over the limit the answer is 429 ProblemDetails with `Retry-After` in seconds. Health and OpenAPI are not limited. A 401 or 403 is answered before the limiter, so it does not use a token.
+
+The gateway in front of the service owns what this instance does not: distributed limits, throttling anonymous floods, and TLS (ADR-0013). There is no `UseForwardedHeaders`, so behind a proxy every token without `sub` shares the proxy's bucket. If it is added, list `KnownProxies` explicitly.
 
 ### Contract tests
 
@@ -142,7 +166,7 @@ There is no mediator. Each concern has one home in an ASP.NET Core extension poi
 | Access log | `UseHttpLogging`: method, path, status and duration in one entry. Query strings, headers and bodies are never logged, so tokens cannot leak. Health probes opt out where they are mapped (`WithHttpLogging(None)`). | done |
 | Exception handling | `UseExceptionHandler` + `UnhandledExceptionHandler`: logs once with method and path, answers 500 ProblemDetails without details | done |
 | Validation | `AddValidation`: requests reach the handler already validated, 400 ProblemDetails otherwise | done |
-| Authentication, authorization, rate limiting | `UseAuthentication`, `UseAuthorization`, `UseRateLimiter` on the route group | planned |
+| Authentication, authorization, rate limiting | `UseAuthentication`, `UseAuthorization`, `UseRateLimiter`; the `/api/v1` group requires a signed-in caller and the `per-caller` limit, and each endpoint names its scope policy | done |
 | Outbound resilience, rate-limit logs, conditional requests | Standard resilience handler plus `DelegatingHandler`s on each source's named `HttpClient` | done |
 | Outbound statistics | `DelegatingHandler` on each source's named `HttpClient` | planned |
 | Caching and telemetry around sources | decorators over `IDataSource` | planned |
@@ -152,7 +176,7 @@ sequenceDiagram
     participant C as Client
     participant L as HttpLogging
     participant E as ExceptionHandler
-    participant A as Auth + RateLimiter (planned)
+    participant A as Auth + RateLimiter
     participant V as Validation filter
     participant H as Endpoint
     participant S as IDataSource decorators (planned)
@@ -180,6 +204,7 @@ Requires the .NET 11 SDK (pinned in `global.json`).
 ```bash
 dotnet build                                   # warnings are errors (Directory.Build.props)
 dotnet test
+dotnet user-jwts create --project src/Aggregator.Api --scope aggregation:read --scope stats:read   # once, before the first run
 dotnet run --project src/Aggregator.AppHost     # Aspire dashboard + API
 ```
 
@@ -193,6 +218,7 @@ Checked on 2026-11-21 with SDK 11.0.100: restore and build produce no warnings.
 |---|---|---|
 | Aspire.Hosting.AppHost / .Dotnet | 17.0.0 | `AddProject<T>` is obsolete; use `AddDotnetProject(name, path)` |
 | Microsoft.Extensions.Http.Resilience / ServiceDiscovery | 11.0.1 | |
+| Microsoft.AspNetCore.Authentication.JwtBearer | 11.0.0 | |
 | OpenTelemetry.* | 1.21.0 | |
 | xunit.v3.mtp-v2 | 4.0.3 | runs on Microsoft.Testing.Platform (`global.json` → `test.runner`) |
 | Shouldly | 4.3.0 | |

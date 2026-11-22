@@ -135,6 +135,44 @@
               }
             }
           },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks the scope this operation requires.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this caller; retry after the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before the next request.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Service Unavailable",
             "content": {
@@ -145,7 +183,14 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "aggregation:read"
+            ]
+          }
+        ]
       }
     },
     "/api/v1/aggregation/stream": {
@@ -284,8 +329,53 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks the scope this operation requires.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this caller; retry after the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before the next request.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "aggregation:read"
+            ]
+          }
+        ]
       }
     },
     "/api/v1/sources": {
@@ -305,8 +395,53 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks the scope this operation requires.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this caller; retry after the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before the next request.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "aggregation:read"
+            ]
+          }
+        ]
       }
     },
     "/api/v1/statistics": {
@@ -326,8 +461,53 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "The bearer token is missing or invalid.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks the scope this operation requires.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests from this caller; retry after the Retry-After header.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait before the next request.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "stats:read"
+            ]
+          }
+        ]
       }
     }
   },
@@ -844,6 +1024,14 @@
             }
           }
         }
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "A JWT carrying the aggregation:read or stats:read scope.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     }
   },
