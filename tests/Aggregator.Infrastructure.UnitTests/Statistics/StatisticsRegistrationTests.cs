@@ -4,6 +4,7 @@ using Aggregator.Infrastructure.Sources.Http;
 using Aggregator.Infrastructure.Statistics;
 using Aggregator.Infrastructure.UnitTests.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Aggregator.Infrastructure.UnitTests.Statistics;
@@ -62,6 +63,60 @@ public sealed class StatisticsRegistrationTests
         var error = Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IOptions<StatisticsOptions>>().Value);
 
         error.Message.ShouldContain("Statistics:Buckets");
+    }
+
+    [Fact]
+    public void AddStatistics_ShouldRegisterTheAnomalyDetectorOnce_WhenCalledTwice()
+    {
+        var services = TestServices.Create([]);
+
+        services.AddStatistics().AddStatistics();
+
+        services.Count(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(AnomalyDetector)).ShouldBe(1);
+    }
+
+    [Fact]
+    public void AddInfrastructure_ShouldUseTheDefaultAnomalySettings_WhenNothingIsConfigured()
+    {
+        using var provider = TestServices.BuildInfrastructure([]);
+
+        var anomalies = provider.GetRequiredService<IOptions<StatisticsOptions>>().Value.Anomalies;
+
+        anomalies.Interval.ShouldBe(TimeSpan.FromMinutes(1));
+        anomalies.Rule.ShouldBe(AnomalyRule.Default);
+        provider.GetServices<IHostedService>().OfType<AnomalyDetector>().ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public void AddInfrastructure_ShouldBindTheAnomalySettings_WhenStatisticsAnomaliesAreSet()
+    {
+        using var provider = TestServices.BuildInfrastructure(new()
+        {
+            ["Statistics:Anomalies:Interval"] = "00:00:30",
+            ["Statistics:Anomalies:Threshold"] = "1.25",
+            ["Statistics:Anomalies:MinSamples"] = "4",
+        });
+
+        var anomalies = provider.GetRequiredService<IOptions<StatisticsOptions>>().Value.Anomalies;
+
+        anomalies.Interval.ShouldBe(TimeSpan.FromSeconds(30));
+        anomalies.Rule.ShouldBe(new AnomalyRule(1.25, 4));
+    }
+
+    [Theory]
+    [InlineData("Interval", "00:00:00")]
+    [InlineData("Interval", "-00:00:01")]
+    [InlineData("Interval", "1.00:00:01")]
+    [InlineData("Threshold", "0")]
+    [InlineData("Threshold", "-0.5")]
+    [InlineData("MinSamples", "0")]
+    public void AddInfrastructure_ShouldRejectTheSettings_WhenAnAnomalySettingIsOutOfRange(string key, string value)
+    {
+        using var provider = TestServices.BuildInfrastructure(new() { [$"Statistics:Anomalies:{key}"] = value });
+
+        var error = Should.Throw<OptionsValidationException>(() => provider.GetRequiredService<IOptions<StatisticsOptions>>().Value);
+
+        error.Message.ShouldContain("Statistics:Anomalies");
     }
 
     [Theory]

@@ -43,12 +43,8 @@ internal sealed class SourceTelemetry : ISourceTelemetry
     {
         _store.RecordRequest(api, duration, outcome, attempts);
 
-        var tags = new TagList
-        {
-            { "source", api.Source },
-            { "provider", api.Provider ?? PrimaryProvider },
-            { "outcome", OutcomeTag(outcome) },
-        };
+        var tags = ApiTags(api);
+        tags.Add("outcome", OutcomeTag(outcome));
         _requests.Add(1, tags);
         if (outcome is RequestOutcome.Success or RequestOutcome.Failure)
         {
@@ -57,6 +53,12 @@ internal sealed class SourceTelemetry : ISourceTelemetry
     }
 
     public void RecordCacheHit(UpstreamApi api) => _store.RecordCacheHit(api);
+
+    /// <summary>The provider's name, or <c>primary</c> for a source's primary provider, which has none.</summary>
+    internal static string ProviderTag(UpstreamApi api) => api.Provider ?? PrimaryProvider;
+
+    /// <summary>The <c>source</c> and <c>provider</c> tags every Aggregator instrument about an external API carries.</summary>
+    internal static TagList ApiTags(UpstreamApi api) => new() { { "source", api.Source }, { "provider", ProviderTag(api) } };
 
     private static double[] Boundaries(PerformanceThresholds thresholds) =>
         [.. ExtraBoundarySeconds.Append(thresholds.FastBelow.TotalSeconds).Append(thresholds.SlowAbove.TotalSeconds).Distinct().Order()];
