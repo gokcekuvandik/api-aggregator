@@ -61,8 +61,35 @@ public sealed class AggregationTracingTests : IDisposable
 
         var children = Spans("aggregate.source").ToDictionary(child => (string)child.GetTagItem("aggregator.source")!);
         children["weather"].Status.ShouldBe(ActivityStatusCode.Error);
+        children["weather"].GetTagItem("aggregator.result").ShouldBe("failure");
         children["news"].Status.ShouldBe(ActivityStatusCode.Unset);
         Single("aggregate").Status.ShouldBe(ActivityStatusCode.Unset);
+    }
+
+    [Fact]
+    public async Task AggregateAsync_ShouldNameTheExceptionOnTheSourceSpan_WhenASourceThrows()
+    {
+        var broken = TestSources.Throwing("broken", new InvalidOperationException("bug"));
+
+        await Should.ThrowAsync<InvalidOperationException>(() => Service(broken).AggregateAsync(Query, TestContext.Current.CancellationToken));
+
+        var source = Single("aggregate.source");
+        source.Status.ShouldBe(ActivityStatusCode.Error);
+        source.StatusDescription.ShouldBe(nameof(InvalidOperationException));
+        Single("aggregate").GetTagItem("aggregator.outcome").ShouldBe("error");
+    }
+
+    [Fact]
+    public async Task AggregateAsync_ShouldTagTheSourceSpanAsCancelled_WhenTheCallerGivesUp()
+    {
+        using var cts = new CancellationTokenSource();
+        var pending = Service(TestSources.Hanging("slow")).AggregateAsync(Query, cts.Token);
+
+        await cts.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => pending);
+        Single("aggregate.source").GetTagItem("aggregator.result").ShouldBe("cancelled");
+        Single("aggregate").GetTagItem("aggregator.outcome").ShouldBe("cancelled");
     }
 
     [Fact]

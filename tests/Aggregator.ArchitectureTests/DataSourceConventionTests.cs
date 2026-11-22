@@ -19,7 +19,7 @@ public sealed class DataSourceConventionTests
         Architecture.Classes.ShouldContain(type => type.FullName == "Aggregator.Infrastructure.Sources.Repositories.GitHub.GitHubSource");
 
     [Fact]
-    public void DomainAndApplication_ShouldNotDependOn_HttpTypes() =>
+    public void DomainAndApplication_ShouldNotDependOnHttpTypes() =>
         Types().That().ResideInAssembly(DomainAssembly).Or().ResideInAssembly(ApplicationAssembly)
             .Should().NotDependOnAny(Types().That().ResideInNamespace("System.Net.Http"))
             .Check(Architecture);

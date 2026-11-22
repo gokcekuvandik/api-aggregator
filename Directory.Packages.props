@@ -54,6 +54,7 @@
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="11.0.1" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.1" />
     <PackageVersion Include="OpenTelemetry.Exporter.InMemory" Version="1.21.0" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="17.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Benchmarks">

@@ -23,8 +23,6 @@ public sealed class TopologyTests
         "NServiceBus",
     ];
 
-    private const string SolutionFile = "Aggregator.slnx";
-
     private static readonly Assembly[] ProductionAssemblies = [DomainAssembly, ApplicationAssembly, InfrastructureAssembly, ApiAssembly];
 
     [Fact]
@@ -43,8 +41,8 @@ public sealed class TopologyTests
     [Fact]
     public void Solution_ShouldNotBePackable()
     {
-        var root = RepositoryRoot();
-        var projects = XDocument.Load(Path.Combine(root, SolutionFile)).Descendants("Project")
+        var root = RepositoryPaths.Root();
+        var projects = XDocument.Load(Path.Combine(root, RepositoryPaths.SolutionFile)).Descendants("Project")
             .Select(project => (string?)project.Attribute("Path") ?? throw new InvalidOperationException("A solution project has no Path."))
             .ToList();
 
@@ -59,17 +57,4 @@ public sealed class TopologyTests
 
     private static List<string> IsPackableValues(string projectFile) =>
         XDocument.Load(projectFile).Descendants("IsPackable").Select(element => element.Value.Trim().ToLowerInvariant()).ToList();
-
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, SolutionFile)))
-            {
-                return directory.FullName;
-            }
-        }
-
-        throw new InvalidOperationException($"No {SolutionFile} above '{AppContext.BaseDirectory}'.");
-    }
 }

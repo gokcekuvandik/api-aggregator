@@ -36,7 +36,9 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore
+        run: |
+          dotnet restore
+          dotnet tool restore
 
       - name: Build (warnings are errors)
         run: dotnet build --no-restore -c Release -warnaserror
@@ -46,11 +48,16 @@ jobs:
         run: dotnet format whitespace Aggregator.slnx --verify-no-changes
 
       - name: Test with coverage
-        run: dotnet test --no-build -c Release --results-directory TestResults --coverage --coverage-output-format cobertura
+        run: dotnet test --no-build -c Release --results-directory TestResults --coverage --coverage-output-format cobertura --coverage-settings coverage.settings.xml
+
+      - name: Coverage report and 80% line gate
+        run: bash build/coverage.sh TestResults
 
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
-          path: TestResults/**/*.cobertura.xml
+          path: |
+            TestResults/**/*.cobertura.xml
+            TestResults/coverage-report/

@@ -90,6 +90,23 @@ public sealed class SourceCacheKeyTests
     }
 
     [Fact]
+    public void For_ShouldKeepTheSearchReadable_WhenTheKeyIsExactlyTheMaximumLength()
+    {
+        var text = TextForKeyOfLength(SourceCacheKey.MaxLength);
+
+        SourceCacheKey.For(Name, SearchFields.Text, Query with { Text = text }).ShouldBe(TextKeyPrefix + text);
+    }
+
+    [Fact]
+    public void For_ShouldHashTheSearch_WhenTheKeyIsOneOverTheMaximumLength() =>
+        SourceCacheKey.For(Name, SearchFields.Text, Query with { Text = TextForKeyOfLength(SourceCacheKey.MaxLength + 1) })
+            .ShouldStartWith($"source:{Name}:v1:sha256:");
+
+    [Fact]
     public void For_ShouldKeepTheSearchReadable_WhenTheKeyFitsTheLimit() =>
         SourceCacheKey.For(Name, SearchFields.Text, Query with { Text = new string('a', 200) }).ShouldEndWith($"q={new string('a', 200)}");
+
+    private const string TextKeyPrefix = $"source:{Name}:v1:q=";
+
+    private static string TextForKeyOfLength(int keyLength) => new('a', keyLength - TextKeyPrefix.Length);
 }

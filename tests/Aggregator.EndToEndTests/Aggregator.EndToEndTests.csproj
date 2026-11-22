@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+    <PackageReference Include="WireMock.Net.Minimal" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Aggregator.AppHost\Aggregator.AppHost.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- One copy of the test key, the WireMock upstreams and the body helpers, shared with the integration tests. -->
+    <Compile Include="..\Aggregator.Api.IntegrationTests\Infrastructure\TestTokens.cs" Link="Shared\TestTokens.cs" />
+    <Compile Include="..\Aggregator.Api.IntegrationTests\Infrastructure\UpstreamServer.cs" Link="Shared\UpstreamServer.cs" />
+    <Compile Include="..\Aggregator.Api.IntegrationTests\Infrastructure\ApiRoutes.cs" Link="Shared\ApiRoutes.cs" />
+    <Compile Include="..\Aggregator.Api.IntegrationTests\Infrastructure\AggregationBody.cs" Link="Shared\AggregationBody.cs" />
+    <Compile Include="..\Aggregator.Api.IntegrationTests\Infrastructure\ResponseAssertions.cs" Link="Shared\ResponseAssertions.cs" />
+    <None Include="..\Fixtures\*.json" LinkBase="Fixtures" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

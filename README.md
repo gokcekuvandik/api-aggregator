@@ -18,8 +18,10 @@ tests/
   Aggregator.Domain.UnitTests
   Aggregator.Application.UnitTests
   Aggregator.Infrastructure.UnitTests
+  Aggregator.AppHost.UnitTests
   Aggregator.Api.IntegrationTests
-  Aggregator.ArchitectureTests  dependency rule, Domain purity, endpoint conventions
+  Aggregator.EndToEndTests      the real AppHost against WireMock upstreams
+  Aggregator.ArchitectureTests  dependency rule, Domain purity, endpoint and test-name conventions
 ```
 
 The dependency rule is enforced, not just documented: `Aggregator.ArchitectureTests` fails when a layer depends outward (ArchUnitNET) or when Domain references an assembly that does not load from the shared framework.
@@ -265,7 +267,7 @@ Each decision was recorded as an architecture decision record (MADR 4). The reco
 | 0011 | Observability with OpenTelemetry and Aspire |
 | 0012 | Runtime: .NET 11 |
 | 0013 | Topology: stateless modular monolith (below) |
-| 0014 | Testing strategy and development method |
+| 0014 | Testing strategy and development method (see Testing) |
 
 ### Topology and scaling (ADR-0013)
 
@@ -305,13 +307,44 @@ Built only when needed:
 - A queue is justified only if work becomes asynchronous, for example scheduled pre-fetching.
 - A source becomes its own service only if it needs independent scaling or heavy processing.
 
+## Testing (ADR-0014)
+
+The code was written test first: a failing test, the smallest change that passes it, then a refactor. Every test runs offline. Upstream APIs are WireMock or MockHttp with recorded payloads from `tests/Fixtures`, and time-dependent rules take their timestamps as parameters.
+
+Test names follow `Subject_ShouldOutcome_WhenCondition`; an unconditional rule drops the `_When` part. `TestNamingConventionTests` parses every test file with Roslyn and fails on a name that does not match.
+
+| Layer | Project | Tools |
+|---|---|---|
+| Unit | `Domain`, `Application`, `Infrastructure`, `AppHost` `.UnitTests` | xUnit v3 on Microsoft.Testing.Platform, Shouldly, NSubstitute, MockHttp, `FakeLogger`, `MetricCollector<T>`, `FakeTimeProvider` |
+| Integration | `Aggregator.Api.IntegrationTests` | `WebApplicationFactory`, WireMock.Net for latency, faults and 429, `JsonSnapshot` contract snapshots |
+| End to end | `Aggregator.EndToEndTests` | `Aspire.Hosting.Testing` starts the real AppHost and API process, with every source pointed at WireMock and a test signing key |
+| Architecture | `Aggregator.ArchitectureTests` | ArchUnitNET and Roslyn: layer rules, Domain purity, endpoint and telemetry conventions, topology, test names |
+
+How the cases were chosen:
+
+| Technique | Where |
+|---|---|
+| Equivalence classes: valid, empty or null, wrong format, out of range | `AggregationQueryTests` (Application and integration), `PageRequestTests`, `ItemFilterTests`, `RelevanceScoreTests` |
+| Boundary values | bucket edges 99 / 100 / 200 / 201 ms (`PerformanceThresholdsTests`), anomaly ratio exactly 1.5 and `MinSamples − 1` (`AnomalyRuleTests`), `pageSize` 0 / 1 / max / max+1 (`PageRequestTests`), `from == to` and `from > to`, cache key at `MaxLength` and one over (`SourceCacheKeyTests`), WMO code range edges (`OpenMeteoSourceTests`) |
+| Decision table: source states × fallback → HTTP status and `sources[]` | `AggregationEndpointTests.DecisionTable`, `AggregationResultTests`, `AggregationServiceTests.OutcomeTable` |
+| Pairwise: `sortBy × sortOrder × category × sources × date range` | the PICT model `TestData/aggregation.pict` generates `AggregationPairwiseCases`; `AggregationPairwiseTests` also proves the rows cover every allowed pair |
+| Fault matrix: status codes, timeouts, circuit breaker, secondary provider, last-known-good | `ResilienceTests`, `SourceResilienceTests`, `ChaosTests` |
+| Concurrency | `Parallel.ForAsync` stress tests check the statistics store's invariants (`StatisticsStoreTests`); concurrent misses on one key (`HybridSourceCacheTests`) |
+| Contract | OpenAPI document and response bodies (`ContractSnapshotTests`) |
+
+Coverage is measured in CI. `build/coverage.sh` merges the Cobertura files with ReportGenerator, writes the summary to the job page, and fails the build below **80% of lines**. Source-generated code (JSON contexts, logging, OpenAPI, validation) is left out when coverage is collected (`coverage.settings.xml`). Last run: **98.9% of lines, 94.7% of branches**, or 81.1% of lines if generated code is counted.
+
+Mutation testing with Stryker.NET was run once: Domain 95.8%, Application 80.7%, Infrastructure 84.2% ([results and what survives](benchmarks/Results/MutationScore.md)). It is not part of CI, because it takes minutes per project.
+
 ## Build and run
 
 Requires the .NET 11 SDK (pinned in `global.json`).
 
 ```bash
 dotnet build                                   # warnings are errors (Directory.Build.props)
-dotnet test
+dotnet test                                    # every project, end-to-end tests included (they start the AppHost; no Docker needed)
+dotnet tool restore                            # ReportGenerator and Stryker.NET, pinned in dotnet-tools.json
+dotnet test --results-directory TestResults --coverage --coverage-output-format cobertura --coverage-settings coverage.settings.xml && bash build/coverage.sh
 dotnet user-jwts create --project src/Aggregator.Api --scope aggregation:read --scope stats:read   # once, before the first run
 dotnet run --project src/Aggregator.AppHost     # Aspire dashboard + API
 dotnet run --project src/Aggregator.AppHost --launch-profile scaled   # 3 replicas + Redis (needs Docker)
@@ -319,7 +352,7 @@ dotnet run --project src/Aggregator.AppHost --launch-profile scaled   # 3 replic
 
 Package versions are managed centrally in `Directory.Packages.props`. Shared build settings (net11.0, nullable, warnings as errors) live in `Directory.Build.props`.
 
-CI (`.github/workflows/ci.yml`) builds, checks formatting and runs the tests with coverage on every push and pull request to `main`. `.gitattributes` checks text out as CRLF, which `.editorconfig` expects, so the format check also passes on Linux.
+CI (`.github/workflows/ci.yml`) builds, checks formatting, runs the tests with coverage and applies the 80% line gate on every push and pull request to `main`. `.gitattributes` checks text out as CRLF, which `.editorconfig` expects, so the format check also passes on Linux. Shell scripts are the exception: they keep LF, so they run on the Linux runner.
 
 ## Package compatibility on net11.0
 
@@ -347,7 +380,10 @@ Checked on 2026-11-21 with SDK 11.0.100: restore and build produce no warnings.
 | RichardSzalay.MockHttp | 7.1.0 | HTTP in unit tests |
 | WireMock.Net.Minimal | 2.32.0 | HTTP in integration tests |
 | Microsoft.Extensions.Diagnostics.Testing | 11.0.1 | `FakeLogger` |
+| Aspire.Hosting.Testing | 17.0.0 | end-to-end tests; runs the AppHost without Docker while scale-out is off |
 | BenchmarkDotNet | 0.15.8 | runs on .NET 11.0.0 with `InProcessEmitToolchain`, so it needs no generated project (checked 2026-11-22) |
+| dotnet-reportgenerator-globaltool | 5.6.1 | local tool. It has no coverage threshold option (an unknown `-minimumCoverageThresholds` is logged and exits 0), so `build/coverage.sh` applies the gate |
+| dotnet-stryker | 5.1.0 | local tool; `test-runner: mtp` drives xUnit v3 on Microsoft.Testing.Platform |
 
 Not used, and why:
 
@@ -356,5 +392,3 @@ Not used, and why:
 - **Microsoft.Extensions.DependencyInjection.Abstractions** is available on net11.0 without a reference (NU1510).
 
 - **WireMock.Net 2.32.0** (the full package) pulls in Microsoft.CodeAnalysis.CSharp 5.9 through its protobuf support, which conflicts with the 5.0 pin the architecture tests use (NU1109). `WireMock.Net.Minimal` has everything the tests need without it.
-
-Still to check when it is added: Stryker.NET (with the mutation run in ADR-0014).

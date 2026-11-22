@@ -15,3 +15,6 @@ indent_size = 4
 csharp_style_namespace_declarations = file_scoped:warning
 csharp_prefer_braces = when_multiline:suggestion
 dotnet_sort_system_directives_first = true
+
+[*.sh]
+end_of_line = lf
