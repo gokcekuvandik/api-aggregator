@@ -6,7 +6,7 @@ namespace Aggregator.Infrastructure.Sources.Caching;
 /// <summary>Last-known-good items in <see cref="HybridCache"/> under their own <c>lkg:</c> keys, so they never pass for fresh answers.</summary>
 internal sealed class HybridLastKnownGoodStore(HybridCache cache) : ILastKnownGoodStore
 {
-    private const string KeyPrefix = "lkg:";
+    internal const string KeyPrefix = "lkg:";
 
     private static readonly HybridCacheEntryOptions ReadOnly = new()
     {

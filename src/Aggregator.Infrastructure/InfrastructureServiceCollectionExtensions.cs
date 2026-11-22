@@ -1,4 +1,5 @@
 using Aggregator.Infrastructure.Sources;
+using Aggregator.Infrastructure.Sources.Caching;
 using Aggregator.Infrastructure.Statistics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +12,7 @@ public static class InfrastructureServiceCollectionExtensions
     {
         services.AddStatistics();
         services.AddSources(configuration);
+        services.AddSourceCacheSecondLevel(configuration);
         return services;
     }
 }

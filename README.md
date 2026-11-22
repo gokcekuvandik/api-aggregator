@@ -246,6 +246,65 @@ The provisioned Grafana dashboard and the same kind of trace in Tempo:
 
 ![Grafana Tempo trace of one aggregation](deploy/observability/screenshots/grafana-trace.png)
 
+## Design decisions
+
+Each decision was recorded as an architecture decision record (MADR 4). The records are working notes kept outside this repository, so this README refers to them by number and carries the decision itself.
+
+| ADR | Decision |
+|---|---|
+| 0001 | Clean Architecture with ports and adapters |
+| 0002 | Minimal APIs and the HTTP contract |
+| 0003 | Cross-cutting concerns without a mediator |
+| 0004 | Pluggable data sources and the chosen external APIs |
+| 0005 | Unified item model, relevance, filtering and sorting |
+| 0006 | Parallel fan-out, resilience and fallback |
+| 0007 | Caching with HybridCache and conditional requests |
+| 0008 | Request statistics store and single measurement point |
+| 0009 | Performance anomaly detection |
+| 0010 | Authentication, authorization and rate limiting |
+| 0011 | Observability with OpenTelemetry and Aspire |
+| 0012 | Runtime: .NET 11 |
+| 0013 | Topology: stateless modular monolith (below) |
+| 0014 | Testing strategy and development method |
+
+### Topology and scaling (ADR-0013)
+
+One stateless service, deployable as N replicas. There is no database, no message broker and no NuGet packaging (`IsPackable` is false). `TopologyTests` fails if a production assembly references a database or broker client. JWTs are validated locally and there are no sessions, so any replica can serve any request.
+
+| Concern | One instance (default) | Scaled out |
+|---|---|---|
+| Source cache | HybridCache, in memory | Redis as the second level once `ConnectionStrings:cache` is set; no code changes |
+| `/api/v1/statistics` | in memory, per instance | still per instance, so two calls behind a load balancer can differ; the cluster view is the OpenTelemetry metrics, summed in Prometheus |
+| Anomaly detection | per instance | the Grafana alert rule sums every instance's metrics, so it covers the cluster |
+| Inbound rate limit | per instance | a gateway owns distributed limits |
+
+Aspire runs the scaled-out shape. Redis runs as a container, so this mode needs Docker:
+
+```bash
+dotnet run --project src/Aggregator.AppHost --launch-profile scaled                            # 3 replicas + Redis
+dotnet run --project src/Aggregator.AppHost --launch-profile scaled -- --ScaleOut:Redis=false   # 3 replicas, L1 only
+dotnet run --project src/Aggregator.AppHost --launch-profile scaled -- --ScaleOut:Replicas=5
+```
+
+`benchmarks/k6/scale-out.js` replays three queries over the replicas and sums upstream calls from every replica's `/statistics` ([results](benchmarks/Results/ScaleOut.md)):
+
+| Topology | Upstream calls |
+|---|---:|
+| 1 replica | 12 |
+| 3 replicas, L1 only | 36 |
+| 3 replicas, Redis L2 | 12 |
+
+When Redis is unreachable, its calls fail at once (no command backlog, a 1 s connect timeout and 500 ms per operation) and HybridCache keeps answering from memory. An entry another replica wrote in a shape this one cannot read counts as a miss and is fetched again.
+
+Cache keys hold the request text, such as the search term, in plain form; only keys over 256 characters are hashed. With Redis on, anyone who can read Redis can read those terms.
+
+Concurrent misses are joined within one process only, so a cold key hit on several replicas at once may still be fetched once per replica.
+
+Built only when needed:
+- Redis becomes mandatory when replicas must share cache or statistics. `IStatisticsStore` can then get a Redis adapter.
+- A queue is justified only if work becomes asynchronous, for example scheduled pre-fetching.
+- A source becomes its own service only if it needs independent scaling or heavy processing.
+
 ## Build and run
 
 Requires the .NET 11 SDK (pinned in `global.json`).
@@ -255,6 +314,7 @@ dotnet build                                   # warnings are errors (Directory.
 dotnet test
 dotnet user-jwts create --project src/Aggregator.Api --scope aggregation:read --scope stats:read   # once, before the first run
 dotnet run --project src/Aggregator.AppHost     # Aspire dashboard + API
+dotnet run --project src/Aggregator.AppHost --launch-profile scaled   # 3 replicas + Redis (needs Docker)
 ```
 
 Package versions are managed centrally in `Directory.Packages.props`. Shared build settings (net11.0, nullable, warnings as errors) live in `Directory.Build.props`.
@@ -268,6 +328,8 @@ Checked on 2026-11-21 with SDK 11.0.100: restore and build produce no warnings.
 | Package | Version | Note |
 |---|---|---|
 | Aspire.Hosting.AppHost / .Dotnet | 17.0.0 | `AddProject<T>` is obsolete; use `AddDotnetProject(name, path)` |
+| Aspire.Hosting.Redis | 17.0.0 | scaled mode only; runs `redis:8.10`. An http-only launch profile needs `ASPIRE_ALLOW_UNSECURED_TRANSPORT=true` |
+| Microsoft.Extensions.Caching.StackExchangeRedis | 11.0.0 | Infrastructure only; HybridCache uses it as its second level |
 | Microsoft.Extensions.Http.Resilience / ServiceDiscovery | 11.0.1 | |
 | Microsoft.AspNetCore.Authentication.JwtBearer | 11.0.0 | |
 | OpenTelemetry.* | 1.21.0 | |
