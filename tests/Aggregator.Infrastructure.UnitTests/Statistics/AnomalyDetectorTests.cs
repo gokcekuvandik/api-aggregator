@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
+using Aggregator.Application.Telemetry;
 using Aggregator.Infrastructure.Statistics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
@@ -27,7 +28,7 @@ public sealed class AnomalyDetectorTests : IDisposable
     public AnomalyDetectorTests()
     {
         var meters = _services.GetRequiredService<IMeterFactory>();
-        _anomalies = new MetricCollector<long>(meters, SourceCacheMetrics.MeterName, AnomalyDetector.AnomaliesName);
+        _anomalies = new MetricCollector<long>(meters, AggregatorDiagnostics.Name, AnomalyDetector.AnomaliesName);
         _detector = new AnomalyDetector(_reader, Options.Create(new StatisticsOptions()), _time, meters, _logger);
     }
 

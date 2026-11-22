@@ -9,4 +9,13 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
+  <!-- MinVer derives the version from git tags such as v1.2.3; only shipped projects carry it, and the telemetry reports it as service.version. -->
+  <PropertyGroup Condition="$([MSBuild]::MakeRelative('$(MSBuildThisFileDirectory)', '$(MSBuildProjectDirectory)').StartsWith('src'))">
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+  </PropertyGroup>
+
+  <ItemGroup Condition="$([MSBuild]::MakeRelative('$(MSBuildThisFileDirectory)', '$(MSBuildProjectDirectory)').StartsWith('src'))">
+    <PackageReference Include="MinVer" PrivateAssets="all" />
+  </ItemGroup>
+
 </Project>

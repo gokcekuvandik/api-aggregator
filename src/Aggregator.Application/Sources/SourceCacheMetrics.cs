@@ -1,11 +1,11 @@
 using System.Diagnostics.Metrics;
+using Aggregator.Application.Telemetry;
 
 namespace Aggregator.Application.Sources;
 
 /// <summary>Counts source cache lookups by source and result: <c>hit</c>, <c>miss</c>, or <c>stale</c> when last-known-good items were served.</summary>
 public sealed class SourceCacheMetrics
 {
-    public const string MeterName = "Aggregator";
     public const string LookupsName = "aggregator.cache.lookups";
 
     private readonly Counter<long> _lookups;
@@ -13,7 +13,7 @@ public sealed class SourceCacheMetrics
     public SourceCacheMetrics(IMeterFactory meterFactory)
     {
         ArgumentNullException.ThrowIfNull(meterFactory);
-        _lookups = meterFactory.Create(MeterName).CreateCounter<long>(LookupsName, unit: "{lookup}", description: "Source cache lookups by result.");
+        _lookups = meterFactory.Create(AggregatorDiagnostics.Name).CreateCounter<long>(LookupsName, unit: "{lookup}", description: "Source cache lookups by result.");
     }
 
     internal void Hit(string source) => Record(source, "hit");

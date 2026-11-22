@@ -21,7 +21,7 @@ public sealed partial class AggregationPairwiseTests
         var sources = SourceNames.Select(CreateSource).ToArray();
         var query = ToQuery(row);
 
-        var result = await new AggregationService(new DataSourceRegistry(sources)).AggregateAsync(query, TestContext.Current.CancellationToken);
+        var result = await new AggregationService(new DataSourceRegistry(sources), TestTelemetry.Unobserved).AggregateAsync(query, TestContext.Current.CancellationToken);
 
         var selected = SelectedSources(row);
         result.Sources.Select(s => s.Name).ShouldBe(selected, ignoreOrder: true);

@@ -2,15 +2,104 @@ using Aggregator.Application.Aggregation;
 using Aggregator.Application.Aggregation.Sorting;
 using Aggregator.Application.Paging;
 using Aggregator.Application.Sources;
+using Aggregator.Application.Telemetry;
 using Aggregator.Application.UnitTests.TestData;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using NSubstitute;
 using SortDirection = Aggregator.Application.Aggregation.Sorting.SortDirection;
 
 namespace Aggregator.Application.UnitTests.Aggregation;
 
-public sealed class AggregationServiceTests
+public sealed class AggregationServiceTests : IDisposable
 {
     private static readonly AggregationQuery DefaultQuery = new(Page: 1, PageSize: PageRequest.DefaultPageSize);
+
+    private readonly TestMeterFactory _meters = new();
+    private readonly AggregationTelemetry _telemetry;
+    private readonly MetricCollector<double> _durations;
+
+    public AggregationServiceTests()
+    {
+        _telemetry = new AggregationTelemetry(_meters);
+        _durations = new MetricCollector<double>(_meters, AggregatorDiagnostics.Name, AggregationTelemetry.AggregationDurationName);
+    }
+
+    /// <summary>What the two sources answer → the outcome an aggregation is recorded with.</summary>
+    public static TheoryData<string, string, string> OutcomeTable => new()
+    {
+        { "success", "cached", "complete" },
+        { "success", "fallback", "degraded" },
+        { "success", "failure", "degraded" },
+        { "fallback", "failure", "degraded" },
+        { "failure", "failure", "failed" },
+    };
+
+    [Theory]
+    [MemberData(nameof(OutcomeTable))]
+    public async Task AggregateAsync_ShouldRecordItsDurationByOutcome_WhenEverySourceHasAnswered(string first, string second, string expected)
+    {
+        var service = Service(Source("news", Answer(first)), Source("weather", Answer(second)));
+
+        await service.AggregateAsync(DefaultQuery, TestContext.Current.CancellationToken);
+
+        var duration = _durations.GetMeasurementSnapshot().ShouldHaveSingleItem();
+        duration.Value.ShouldBeGreaterThanOrEqualTo(0);
+        duration.Tags.ShouldBe(new Dictionary<string, object?> { ["mode"] = "page", ["outcome"] = expected }, ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task AggregateAsync_ShouldRecordAnError_WhenASourceThrows()
+    {
+        var broken = Substitute.For<IDataSource>();
+        broken.Name.Returns("broken");
+        broken.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns<SourceResult>(_ => throw new InvalidOperationException("bug"));
+
+        await Should.ThrowAsync<InvalidOperationException>(() => Service(broken).AggregateAsync(DefaultQuery, TestContext.Current.CancellationToken));
+
+        _durations.GetMeasurementSnapshot().ShouldHaveSingleItem().Tags["outcome"].ShouldBe("error");
+    }
+
+    [Fact]
+    public async Task AggregateAsync_ShouldRecordACancellation_WhenTheCallerGivesUp()
+    {
+        using var cts = new CancellationTokenSource();
+        var pending = Service(TestSources.Hanging("slow")).AggregateAsync(DefaultQuery, cts.Token);
+
+        await cts.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => pending);
+        _durations.GetMeasurementSnapshot().ShouldHaveSingleItem().Tags["outcome"].ShouldBe("cancelled");
+    }
+
+    [Fact]
+    public async Task StreamAsync_ShouldRecordItsDurationInStreamMode_WhenEverySourceHasBeenYielded()
+    {
+        var service = Service(Source("news", new SourceSuccess([])), Source("weather", new SourceFailure("down")));
+
+        await ToListAsync(service.StreamAsync(DefaultQuery, TestContext.Current.CancellationToken));
+
+        _durations.GetMeasurementSnapshot().ShouldHaveSingleItem().Tags.ShouldBe(
+            new Dictionary<string, object?> { ["mode"] = "stream", ["outcome"] = "degraded" }, ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ShouldRecordACancellation_WhenTheConsumerStopsEarly()
+    {
+        var service = Service(TestSources.Hanging("slow"), Source("fast", new SourceSuccess([])));
+
+        await foreach (var _ in service.StreamAsync(DefaultQuery, TestContext.Current.CancellationToken))
+        {
+            break;
+        }
+
+        _durations.GetMeasurementSnapshot().ShouldHaveSingleItem().Tags["outcome"].ShouldBe("cancelled");
+    }
+
+    public void Dispose()
+    {
+        _durations.Dispose();
+        _meters.Dispose();
+    }
 
     [Fact]
     public async Task AggregateAsync_ShouldMergeItemsFromEverySource_WhenSourcesReturnData()
@@ -236,8 +325,17 @@ public sealed class AggregationServiceTests
         errors[nameof(AggregationQuery.Category)].ShouldBe(["None of the selected sources serves category 'news'."]);
     }
 
-    private static AggregationService Service(params IDataSource[] sources) => new(new DataSourceRegistry(sources));
+    private AggregationService Service(params IDataSource[] sources) => new(new DataSourceRegistry(sources), _telemetry);
 
+    private static SourceResult Answer(string kind) => kind switch
+    {
+        "success" => new SourceSuccess([]),
+        "cached" => new SourceCached([], TimeSpan.FromMinutes(1)),
+        "fallback" => new SourceFallback([], TimeSpan.Zero, "secondary"),
+        _ => new SourceFailure("down"),
+    };
+
+    /// <summary>A source that answers only by being cancelled.</summary>
     private static async Task<List<SourceUpdate>> ToListAsync(IAsyncEnumerable<SourceUpdate> updates)
     {
         var list = new List<SourceUpdate>();

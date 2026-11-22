@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
+using Aggregator.Application.Telemetry;
 using Aggregator.Domain.Statistics;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -43,7 +44,7 @@ internal sealed partial class AnomalyDetector : BackgroundService
         _rule = options.Value.Anomalies.Rule;
         _interval = options.Value.Anomalies.Interval;
         _logger = logger;
-        _anomalies = meterFactory.Create(SourceCacheMetrics.MeterName)
+        _anomalies = meterFactory.Create(AggregatorDiagnostics.Name)
             .CreateCounter<long>(AnomaliesName, unit: "{anomaly}", description: "Times an external API turned anomalously slow.");
         _timer = new PeriodicTimer(_interval, time);
     }

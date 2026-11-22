@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
+using Aggregator.Application.Telemetry;
 using Aggregator.Infrastructure.Sources.Caching;
 using Aggregator.Infrastructure.Sources.Http;
 using Aggregator.Infrastructure.Sources.Resilience;
@@ -37,6 +38,7 @@ public static class DataSourceServiceCollectionExtensions
         services.AddStatistics();
         services.AddSourceCaching();
         services.AddSourceCacheOptions(name, DataSourceOptions.SectionFor(name));
+        services.TryAddSingleton<AggregationTelemetry>();
         services.AddSingleton<IDataSource>(provider =>
         {
             var cache = provider.GetRequiredService<IOptionsMonitor<SourceCacheOptions>>().Get(name);
@@ -46,7 +48,8 @@ public static class DataSourceServiceCollectionExtensions
                 provider.GetKeyedService<SourceProvider>(SecondaryClientName(name)),
                 provider.GetRequiredService<ILastKnownGoodStore>(),
                 time,
-                cache.LastKnownGoodTtl);
+                cache.LastKnownGoodTtl,
+                provider.GetRequiredService<AggregationTelemetry>());
             return cache.Enabled
                 ? new CachedDataSource(
                     resilient,
@@ -94,7 +97,7 @@ public static class DataSourceServiceCollectionExtensions
 
         services.AddOptions<TOptions>().BindConfiguration(section).Configure(options => options.ClientName = clientName).ValidateOnStart();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<TOptions>>(new DataSourceOptionsValidator<TOptions>(section)));
-        services.AddSourceResilience<TOptions>(section, clientName);
+        services.AddSourceResilience<TOptions>(api, section, clientName);
 
         services.TryAddSingleton<SourceFetcher>();
         services.AddSingleton<TSource>();

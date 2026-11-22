@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
+using Aggregator.Application.Telemetry;
 using Aggregator.Domain.Statistics;
 using Aggregator.Infrastructure.Statistics;
 using Aggregator.Infrastructure.UnitTests.TestDoubles;
@@ -24,8 +25,8 @@ public sealed class SourceTelemetryTests : IDisposable
     {
         var meters = _services.GetRequiredService<IMeterFactory>();
         _telemetry = new SourceTelemetry(_store, meters, PerformanceThresholds.Default);
-        _durations = new MetricCollector<double>(meters, SourceCacheMetrics.MeterName, SourceTelemetry.DurationName);
-        _requests = new MetricCollector<long>(meters, SourceCacheMetrics.MeterName, SourceTelemetry.RequestsName);
+        _durations = new MetricCollector<double>(meters, AggregatorDiagnostics.Name, SourceTelemetry.DurationName);
+        _requests = new MetricCollector<long>(meters, AggregatorDiagnostics.Name, SourceTelemetry.RequestsName);
     }
 
     [Fact]

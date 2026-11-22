@@ -5,6 +5,10 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
+  <ItemGroup Label="Build">
+    <PackageVersion Include="MinVer" Version="6.0.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Aspire">
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="17.0.0" />
     <PackageVersion Include="Aspire.Hosting.Dotnet" Version="17.0.0" />
@@ -47,6 +51,7 @@
     <PackageVersion Include="WireMock.Net.Minimal" Version="2.32.0" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="11.0.1" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.1" />
+    <PackageVersion Include="OpenTelemetry.Exporter.InMemory" Version="1.21.0" />
   </ItemGroup>
 
   <ItemGroup Label="Benchmarks">

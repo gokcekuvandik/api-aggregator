@@ -1,0 +1,140 @@
+{
+  "uid": "aggregator",
+  "title": "Aggregator",
+  "description": "The Aggregator's fan-out, cache, fallback, circuit and anomaly instruments. The same measurements feed /api/v1/statistics.",
+  "tags": ["aggregator"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Upstream duration p95 by source (retries included)",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, source, provider) (rate(aggregator_source_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{source}} ({{provider}})"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Aggregation duration p95 by mode",
+      "description": "About as long as the slowest source when the fan-out runs in parallel.",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, mode) (rate(aggregator_aggregation_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{mode}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Upstream requests by outcome",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (source, outcome) (rate(aggregator_source_requests_total[5m]))",
+          "legendFormat": "{{source}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Cache hit ratio by source",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "(sum by (source) (rate(aggregator_cache_lookups_total{result=\"hit\"}[5m])) or sum by (source) (rate(aggregator_cache_lookups_total[5m])) * 0) / sum by (source) (rate(aggregator_cache_lookups_total[5m]))",
+          "legendFormat": "{{source}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Fallback activations by result",
+      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (source, result) (increase(aggregator_fallback_activations_total[5m]))",
+          "legendFormat": "{{source}} {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "state-timeline",
+      "title": "Circuit state (0 closed, 1 half-open, 2 open)",
+      "gridPos": { "x": 8, "y": 16, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "closed", "color": "green" },
+                "1": { "text": "half-open", "color": "yellow" },
+                "2": { "text": "open", "color": "red" }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "max by (source, provider) (aggregator_source_circuit_state)",
+          "legendFormat": "{{source}} ({{provider}})"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Anomalies reported",
+      "gridPos": { "x": 16, "y": 16, "w": 8, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (source, provider) (increase(aggregator_source_anomalies_total[1h]))",
+          "legendFormat": "{{source}} ({{provider}})"
+        }
+      ]
+    }
+  ]
+}

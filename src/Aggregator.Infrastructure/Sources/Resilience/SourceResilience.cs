@@ -1,4 +1,6 @@
+using Aggregator.Application.Statistics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 
@@ -23,15 +25,42 @@ internal static class SourceResilience
     /// <summary>The options name <c>AddStandardResilienceHandler</c> uses for a client.</summary>
     private static string OptionsName(string clientName) => $"{clientName}-standard";
 
-    public static void AddSourceResilience<TOptions>(this IServiceCollection services, string section, string clientName)
+    public static void AddSourceResilience<TOptions>(this IServiceCollection services, UpstreamApi api, string section, string clientName)
         where TOptions : DataSourceOptions
     {
-        services.AddOptions<HttpStandardResilienceOptions>(OptionsName(clientName)).Configure(ApplyDefaults).BindConfiguration(ResilienceSection(section));
+        services.TryAddSingleton<CircuitStateTracker>();
+        services.AddSingleton(new TrackedCircuit(api));
+
+        // Post-configured so binding the section cannot replace the callbacks.
+        services.AddOptions<HttpStandardResilienceOptions>(OptionsName(clientName))
+            .Configure(ApplyDefaults)
+            .BindConfiguration(ResilienceSection(section))
+            .PostConfigure<CircuitStateTracker>((options, tracker) => ReportCircuitState(options.CircuitBreaker, tracker, api));
         services.AddSingleton<IValidateOptions<TOptions>>(provider => new TimeoutBudgetValidator<TOptions>(
             section, clientName, provider.GetRequiredService<IOptionsMonitor<HttpStandardResilienceOptions>>()));
     }
 
     private static string ResilienceSection(string section) => $"{section}:{SectionName}";
+
+    /// <summary>Reports the breaker's transitions to the tracker; nothing else sets these callbacks.</summary>
+    private static void ReportCircuitState(HttpCircuitBreakerStrategyOptions breaker, CircuitStateTracker tracker, UpstreamApi api)
+    {
+        breaker.OnOpened = _ =>
+        {
+            tracker.Opened(api);
+            return ValueTask.CompletedTask;
+        };
+        breaker.OnHalfOpened = _ =>
+        {
+            tracker.HalfOpened(api);
+            return ValueTask.CompletedTask;
+        };
+        breaker.OnClosed = _ =>
+        {
+            tracker.Closed(api);
+            return ValueTask.CompletedTask;
+        };
+    }
 
     private static void ApplyDefaults(HttpStandardResilienceOptions options)
     {

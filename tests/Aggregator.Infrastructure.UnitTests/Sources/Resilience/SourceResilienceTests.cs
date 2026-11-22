@@ -1,8 +1,14 @@
+using System.Diagnostics.Metrics;
+using Aggregator.Application.Telemetry;
 using Aggregator.Infrastructure.Sources;
+using Aggregator.Infrastructure.Sources.Resilience;
 using Aggregator.Infrastructure.UnitTests.TestDoubles;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
+using Polly;
+using Polly.CircuitBreaker;
 using static Aggregator.Infrastructure.UnitTests.Sources.DataSourceRegistrationTests;
 
 namespace Aggregator.Infrastructure.UnitTests.Sources.Resilience;
@@ -75,6 +81,43 @@ public sealed class SourceResilienceTests
         });
 
         await Should.NotThrowAsync(() => provider.GetRequiredService<IAsyncStartupValidator>().ValidateAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AddDataSource_ShouldReportEachProvidersCircuitState_WhenItsBreakerChangesState()
+    {
+        using var provider = Build([], withSecondary: true);
+        using var states = new MetricCollector<int>(provider.GetRequiredService<IMeterFactory>(), AggregatorDiagnostics.Name, CircuitStateTracker.CircuitStateName);
+        var primary = Standard(provider, Name).CircuitBreaker;
+        var secondary = Standard(provider, "fake-secondary").CircuitBreaker;
+        var context = ResilienceContextPool.Shared.Get(TestContext.Current.CancellationToken);
+        using var failed = new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError);
+
+        await primary.OnOpened.ShouldNotBeNull()(new OnCircuitOpenedArguments<HttpResponseMessage>(context, Outcome.FromResult(failed), TimeSpan.FromSeconds(15), isManual: false));
+        await secondary.OnHalfOpened.ShouldNotBeNull()(new OnCircuitHalfOpenedArguments(context));
+
+        states.RecordObservableInstruments();
+        var byProvider = states.GetMeasurementSnapshot().ToDictionary(measurement => (string)measurement.Tags["provider"]!, measurement => measurement.Value);
+        byProvider.ShouldBe(new Dictionary<string, int> { ["primary"] = 2, ["fake-backup"] = 1 }, ignoreOrder: true);
+        ResilienceContextPool.Shared.Return(context);
+    }
+
+    [Fact]
+    public async Task AddDataSource_ShouldReportClosedAgain_WhenTheBreakerCloses()
+    {
+        using var provider = Build([]);
+        using var states = new MetricCollector<int>(provider.GetRequiredService<IMeterFactory>(), AggregatorDiagnostics.Name, CircuitStateTracker.CircuitStateName);
+        var breaker = Standard(provider, Name).CircuitBreaker;
+        var context = ResilienceContextPool.Shared.Get(TestContext.Current.CancellationToken);
+        using var failed = new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError);
+        using var recovered = new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+
+        await breaker.OnOpened.ShouldNotBeNull()(new OnCircuitOpenedArguments<HttpResponseMessage>(context, Outcome.FromResult(failed), TimeSpan.FromSeconds(15), isManual: false));
+        await breaker.OnClosed.ShouldNotBeNull()(new OnCircuitClosedArguments<HttpResponseMessage>(context, Outcome.FromResult(recovered), isManual: false));
+
+        states.RecordObservableInstruments();
+        states.GetMeasurementSnapshot().ShouldHaveSingleItem().Value.ShouldBe(0);
+        ResilienceContextPool.Shared.Return(context);
     }
 
     private static HttpStandardResilienceOptions Standard(ServiceProvider provider, string clientName) =>

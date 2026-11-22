@@ -1,11 +1,14 @@
+using System.Diagnostics;
 using Aggregator.Application.Aggregation;
 using Aggregator.Application.Sources;
+using Aggregator.Application.Telemetry;
 using Aggregator.Application.UnitTests.TestData;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using NSubstitute;
 
 namespace Aggregator.Application.UnitTests.Sources;
 
-public sealed class ResilientDataSourceTests
+public sealed class ResilientDataSourceTests : IDisposable
 {
     private const string Name = "weather";
     private const string SecondaryName = "open-meteo";
@@ -19,6 +22,15 @@ public sealed class ResilientDataSourceTests
 
     private readonly InMemoryStore _store = new();
     private readonly StubClock _clock = new(Now);
+    private readonly TestMeterFactory _meters = new();
+    private readonly AggregationTelemetry _telemetry;
+    private readonly MetricCollector<long> _fallbacks;
+
+    public ResilientDataSourceTests()
+    {
+        _telemetry = new AggregationTelemetry(_meters);
+        _fallbacks = new MetricCollector<long>(_meters, AggregatorDiagnostics.Name, AggregationTelemetry.FallbackActivationsName);
+    }
 
     public enum Primary
     {
@@ -101,6 +113,67 @@ public sealed class ResilientDataSourceTests
         }
     }
 
+    /// <summary>Primary outcome × secondary provider × last-known-good entry → the fallback activation counted, or none while the primary answers.</summary>
+    public static TheoryData<Primary, Secondary, bool, string?> FallbackTable => new()
+    {
+        { Primary.Success, Secondary.Success, true, null },
+        { Primary.Failure, Secondary.Success, true, "secondary" },
+        { Primary.Timeout, Secondary.Success, false, "secondary" },
+        { Primary.Failure, Secondary.Failure, true, "last_known_good" },
+        { Primary.Timeout, Secondary.None, true, "last_known_good" },
+        { Primary.Failure, Secondary.Failure, false, "none" },
+        { Primary.Failure, Secondary.None, false, "none" },
+    };
+
+    [Theory]
+    [MemberData(nameof(FallbackTable))]
+    public async Task FetchAsync_ShouldCountOneFallbackActivationByResult_WhenPrimaryFails(Primary primary, Secondary secondary, bool stored, string? expected)
+    {
+        if (stored)
+        {
+            _store.Save(Key(Query), new LastKnownGood(TestItems.Many(1, "stored"), Now - StoredAge));
+        }
+
+        await Resilient(PrimaryProvider(primary), SecondaryProvider(secondary)).FetchAsync(Query, TestContext.Current.CancellationToken);
+
+        var measurements = _fallbacks.GetMeasurementSnapshot();
+        if (expected is null)
+        {
+            measurements.ShouldBeEmpty();
+            return;
+        }
+
+        var activation = measurements.ShouldHaveSingleItem();
+        activation.Value.ShouldBe(1);
+        activation.Tags.ShouldBe(new Dictionary<string, object?> { ["source"] = Name, ["result"] = expected }, ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task FetchAsync_ShouldAddAFallbackEventToTheCurrentSpan_WhenTheSecondaryStandsIn()
+    {
+        using var span = new Activity("test").Start();
+
+        await Resilient(PrimaryProvider(Primary.Failure), SecondaryProvider(Secondary.Success)).FetchAsync(Query, TestContext.Current.CancellationToken);
+
+        var fallback = span.Events.ShouldHaveSingleItem();
+        fallback.Name.ShouldBe("aggregator.fallback");
+        fallback.Tags.ToDictionary().ShouldBe(
+            new Dictionary<string, object?> { ["aggregator.source"] = Name, ["aggregator.fallback.result"] = "secondary", ["aggregator.provider"] = SecondaryName },
+            ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task FetchAsync_ShouldCountNothing_WhenCallerCancels()
+    {
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            Resilient(PrimaryProvider(Primary.Timeout), SecondaryProvider(Secondary.Success)).FetchAsync(Query, cts.Token));
+
+        _fallbacks.GetMeasurementSnapshot().ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task FetchAsync_ShouldStoreLiveItems_WhenPrimarySucceeds()
     {
@@ -119,7 +192,7 @@ public sealed class ResilientDataSourceTests
     [InlineData(-1)]
     public void Constructor_ShouldThrow_WhenLastKnownGoodLifetimeIsNotPositive(int seconds) =>
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            new ResilientDataSource(PrimaryProvider(Primary.Success), null, _store, _clock, TimeSpan.FromSeconds(seconds)));
+            new ResilientDataSource(PrimaryProvider(Primary.Success), null, _store, _clock, TimeSpan.FromSeconds(seconds), _telemetry));
 
     [Fact]
     public async Task FetchAsync_ShouldStoreSecondaryItems_WhenOnlySecondarySucceeds()
@@ -249,14 +322,20 @@ public sealed class ResilientDataSourceTests
 
     private static string Key(AggregationQuery query) => SourceCacheKey.For(Name, SearchFields.All, query);
 
+    public void Dispose()
+    {
+        _fallbacks.Dispose();
+        _meters.Dispose();
+    }
+
     private ResilientDataSource Resilient(SourceProvider primary, SourceProvider? secondary = null) =>
-        new(primary, secondary, _store, _clock, LastKnownGoodLifetime);
+        new(primary, secondary, _store, _clock, LastKnownGoodLifetime, _telemetry);
 
     private static SourceProvider PrimaryProvider(Primary outcome) => new(Name, outcome switch
     {
         Primary.Success => Returning(Name, new SourceSuccess(TestItems.Many(1, "primary"))),
         Primary.Failure => Returning(Name, new SourceFailure(PrimaryError)),
-        _ => Hanging(Name),
+        _ => TestSources.Hanging(Name),
     }, outcome == Primary.Timeout ? ShortTimeout : Timeout);
 
     private static SourceProvider? SecondaryProvider(Secondary outcome) => outcome switch
@@ -267,23 +346,6 @@ public sealed class ResilientDataSourceTests
     };
 
     private static IDataSource Returning(string name, SourceResult result) => TestSources.Returning(name, result);
-
-    private static IDataSource Hanging(string name)
-    {
-        var source = Substitute.For<IDataSource>();
-        source.Name.Returns(name);
-        source.Categories.Returns([name]);
-        source.UsedFields.Returns(SearchFields.All);
-        source.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>())
-            .Returns(call => WaitForCancellationAsync(call.Arg<CancellationToken>()));
-        return source;
-    }
-
-    private static async Task<SourceResult> WaitForCancellationAsync(CancellationToken cancellationToken)
-    {
-        await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
-        throw new InvalidOperationException("Unreachable: the delay only ends by cancellation.");
-    }
 
     private sealed class InMemoryStore : ILastKnownGoodStore
     {
