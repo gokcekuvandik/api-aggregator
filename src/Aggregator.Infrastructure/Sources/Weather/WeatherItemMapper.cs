@@ -5,9 +5,6 @@ using Aggregator.Infrastructure.Sources.Relevance;
 
 namespace Aggregator.Infrastructure.Sources.Weather;
 
-/// <summary>One forecast reading, already in provider-neutral form.</summary>
-internal sealed record WeatherReading(DateTimeOffset At, double? MinTemperature, double? MaxTemperature, string Conditions);
-
 /// <summary>Turns weather readings from either provider into items, scored by closeness in time.</summary>
 internal static class WeatherItemMapper
 {

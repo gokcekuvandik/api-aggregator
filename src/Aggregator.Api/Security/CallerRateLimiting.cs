@@ -18,7 +18,7 @@ internal static class CallerRateLimiting
             .BindConfiguration(RateLimitingOptions.SectionName)
             .Validate(
                 options => options.IsValid,
-                $"{RateLimitingOptions.SectionName}: TokenLimit and TokensPerPeriod must be at least 1, and ReplenishmentPeriod positive and at most an hour.")
+                OptionsValidationMessages.InvalidRateLimiting)
             .ValidateOnStart();
 
         services.AddRateLimiter(limiter =>

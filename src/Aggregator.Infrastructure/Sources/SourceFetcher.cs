@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using Aggregator.Application.Sources;
@@ -90,7 +89,7 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
 
         if (sent.Payload is null)
         {
-            var error = Unreadable(client.SourceName);
+            var error = SourceFailureMessages.Unreadable(client.SourceName);
             LogSourceFailed(client.SourceName, client.ClientName, error, exception: null);
             return (default, new SourceFailure(error));
         }
@@ -116,15 +115,13 @@ internal sealed partial class SourceFetcher(IHttpClientFactory httpClientFactory
     private static string? Describe(Exception exception, string sourceName, CancellationToken cancellationToken) => exception switch
     {
         OperationCanceledException when cancellationToken.IsCancellationRequested => null,
-        HttpRequestException { StatusCode: { } status } => $"{sourceName} answered HTTP {(int)status}.",
-        HttpRequestException or IOException => $"{sourceName} could not be reached.",
-        TimeoutRejectedException or OperationCanceledException => SourceFailure.TimedOut(sourceName).Error,
-        ExecutionRejectedException => $"{sourceName} is temporarily unavailable.",
-        JsonException => Unreadable(sourceName),
+        HttpRequestException { StatusCode: { } status } => SourceFailureMessages.AnsweredStatus(sourceName, (int)status),
+        HttpRequestException or IOException => SourceFailureMessages.Unreachable(sourceName),
+        TimeoutRejectedException or OperationCanceledException => SourceFailureMessages.TimedOut(sourceName),
+        ExecutionRejectedException => SourceFailureMessages.Unavailable(sourceName),
+        JsonException => SourceFailureMessages.Unreadable(sourceName),
         _ => null,
     };
-
-    private static string Unreadable(string sourceName) => $"{sourceName} returned an unreadable response.";
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Source {Source} failed on client {Client}: {Error}")]
     private partial void LogSourceFailed(string source, string client, string error, Exception? exception);

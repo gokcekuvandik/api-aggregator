@@ -1,5 +1,4 @@
 using System.Diagnostics.Metrics;
-using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
 using Aggregator.Application.Telemetry;
 using Aggregator.Domain.Statistics;

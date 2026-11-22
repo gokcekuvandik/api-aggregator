@@ -36,7 +36,7 @@ internal static class SecondLevelCacheServiceCollectionExtensions
             options.ConfigurationOptions = FailFast(connectionString);
         });
         services.AddOptions<RedisCacheOptions>()
-            .Validate(options => options.ConfigurationOptions is not null, $"ConnectionStrings:{ConnectionStringName} must be a valid Redis connection string when it is set.")
+            .Validate(options => options.ConfigurationOptions is not null, OptionsValidationMessages.InvalidRedisConnection(ConnectionStringName))
             .ValidateOnStart();
         return services;
     }

@@ -3,9 +3,6 @@ using Aggregator.Domain.Items;
 
 namespace Aggregator.Infrastructure.Sources.Relevance;
 
-/// <summary>GitHub's search score and the repository's star count.</summary>
-internal sealed record RepositorySignal(double SearchScore, int Stars);
-
 /// <summary>
 /// Blends the search score and the star count equally, each scaled to the best in the batch.
 /// Stars are compared on a log scale so one very popular repository does not flatten the rest.

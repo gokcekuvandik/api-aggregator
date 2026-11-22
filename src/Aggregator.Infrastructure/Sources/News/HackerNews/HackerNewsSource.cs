@@ -1,16 +1,10 @@
 using System.Globalization;
-using System.Text.Json.Serialization;
 using Aggregator.Application.Aggregation;
 using Aggregator.Application.Sources;
 using Aggregator.Infrastructure.Sources.Relevance;
 using Microsoft.Extensions.Options;
 
 namespace Aggregator.Infrastructure.Sources.News.HackerNews;
-
-internal sealed class HackerNewsOptions : NewsOptions
-{
-    public HackerNewsOptions() => BaseAddress = new Uri("https://hn.algolia.com/");
-}
 
 /// <summary>Hacker News stories through the Algolia search API, which needs no API key and ranks by relevance.</summary>
 internal sealed class HackerNewsSource(SourceFetcher fetcher, IOptions<HackerNewsOptions> options, IRelevanceScorer<object> scorer) : IDataSource
@@ -61,20 +55,3 @@ internal sealed class HackerNewsSource(SourceFetcher fetcher, IOptions<HackerNew
         Author: hit.Author,
         Points: hit.Points);
 }
-
-internal sealed record HackerNewsSearch(IReadOnlyList<HackerNewsHit> Hits);
-
-internal sealed record HackerNewsHit(
-    [property: JsonPropertyName("objectID")] string ObjectId,
-    DateTimeOffset CreatedAt,
-    string? Title = null,
-    string? Url = null,
-    string? Author = null,
-    int? Points = null);
-
-[JsonSourceGenerationOptions(
-    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
-    RespectNullableAnnotations = true,
-    RespectRequiredConstructorParameters = true)]
-[JsonSerializable(typeof(HackerNewsSearch))]
-internal sealed partial class HackerNewsJsonContext : JsonSerializerContext;

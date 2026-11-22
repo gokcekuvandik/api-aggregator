@@ -24,8 +24,8 @@ internal static class StatisticsServiceCollectionExtensions
 
         services.AddOptions<StatisticsOptions>()
             .BindConfiguration(StatisticsOptions.SectionName)
-            .Validate(options => AreValid(options.Buckets), $"{BucketsSection}: FastBelow must be positive and SlowAbove must not be shorter than it.")
-            .Validate(options => AreValid(options.Anomalies), $"{AnomaliesSection}: Interval must be positive and at most a day, Threshold positive, and MinSamples at least 1.")
+            .Validate(options => AreValid(options.Buckets), OptionsValidationMessages.InvalidBuckets(BucketsSection))
+            .Validate(options => AreValid(options.Anomalies), OptionsValidationMessages.InvalidAnomalies(AnomaliesSection))
             .ValidateOnStart();
         services.AddMetrics();
         services.TryAddSingleton(TimeProvider.System);

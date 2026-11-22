@@ -354,9 +354,9 @@ public sealed class AggregationServiceTests : IDisposable
     };
 
     /// <summary>A source that answers only by being cancelled.</summary>
-    private static async Task<List<SourceUpdate>> ToListAsync(IAsyncEnumerable<SourceUpdate> updates)
+    private static async Task<List<SourceUpdateResult>> ToListAsync(IAsyncEnumerable<SourceUpdateResult> updates)
     {
-        var list = new List<SourceUpdate>();
+        var list = new List<SourceUpdateResult>();
         await foreach (var update in updates)
         {
             list.Add(update);

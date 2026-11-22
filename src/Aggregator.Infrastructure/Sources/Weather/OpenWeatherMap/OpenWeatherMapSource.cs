@@ -1,22 +1,11 @@
-using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Net;
-using System.Text.Json.Serialization;
 using Aggregator.Application.Aggregation;
 using Aggregator.Application.Sources;
 using Aggregator.Infrastructure.Sources.Relevance;
 using Microsoft.Extensions.Options;
 
 namespace Aggregator.Infrastructure.Sources.Weather.OpenWeatherMap;
-
-internal sealed class OpenWeatherMapOptions : WeatherOptions
-{
-    public OpenWeatherMapOptions() => BaseAddress = new Uri("https://api.openweathermap.org/");
-
-    [Required]
-    [RegularExpression(HeaderSafePattern, ErrorMessage = HeaderSafeMessage)]
-    public string? ApiKey { get; set; }
-}
 
 /// <summary>
 /// Three-hourly forecast from OpenWeatherMap; used instead of Open-Meteo when an API key is configured.
@@ -62,20 +51,3 @@ internal sealed class OpenWeatherMapSource(SourceFetcher fetcher, IOptions<OpenW
         MaxTemperature: entry.Main.TempMax,
         Conditions: entry.Weather is [{ Description: { } description }, ..] ? description : UnknownConditions);
 }
-
-internal sealed record OpenWeatherMapForecast(IReadOnlyList<OpenWeatherMapEntry> List, OpenWeatherMapCity? City = null);
-
-internal sealed record OpenWeatherMapCity(string? Name = null);
-
-internal sealed record OpenWeatherMapEntry(long Dt, OpenWeatherMapMain Main, IReadOnlyList<OpenWeatherMapCondition>? Weather = null);
-
-internal sealed record OpenWeatherMapMain(double? TempMin = null, double? TempMax = null);
-
-internal sealed record OpenWeatherMapCondition(string? Description = null);
-
-[JsonSourceGenerationOptions(
-    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
-    RespectNullableAnnotations = true,
-    RespectRequiredConstructorParameters = true)]
-[JsonSerializable(typeof(OpenWeatherMapForecast))]
-internal sealed partial class OpenWeatherMapJsonContext : JsonSerializerContext;

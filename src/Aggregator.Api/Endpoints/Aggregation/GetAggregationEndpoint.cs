@@ -1,4 +1,5 @@
 using Aggregator.Api.Contracts;
+using Aggregator.Api.Http;
 using Aggregator.Api.Security;
 using Aggregator.Application.Aggregation;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -44,8 +45,8 @@ public sealed class GetAggregationEndpoint : IEndpoint
         {
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "No source returned data",
-                detail: "Every source failed and no fallback data was available. See sources for details.",
+                title: ProblemTitles.NoSourceData,
+                detail: ProblemTitles.NoSourceDataDetail,
                 extensions: new Dictionary<string, object?> { ["sources"] = sources });
         }
 

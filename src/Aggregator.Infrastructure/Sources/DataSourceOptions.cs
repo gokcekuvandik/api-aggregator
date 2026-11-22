@@ -10,8 +10,6 @@ public abstract class DataSourceOptions
     /// <summary>Visible ASCII only, so a key or token can go into a header or query string without breaking the request.</summary>
     internal const string HeaderSafePattern = @"^[!-~]+$";
 
-    internal const string HeaderSafeMessage = "{0} may contain only visible ASCII characters, with no spaces.";
-
     private const string SecondarySectionName = "Secondary";
 
     internal static string SectionFor(string sourceName) => $"{SectionName}:{sourceName}";

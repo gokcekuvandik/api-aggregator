@@ -3,27 +3,6 @@ using Aggregator.Application.Telemetry;
 
 namespace Aggregator.Application.Sources;
 
-/// <summary>One provider behind a source, with the most time a single fetch from it may take.</summary>
-public sealed record SourceProvider
-{
-    public SourceProvider(string name, IDataSource source, TimeSpan timeout)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        ArgumentNullException.ThrowIfNull(source);
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(timeout, TimeSpan.Zero);
-
-        Name = name;
-        Source = source;
-        Timeout = timeout;
-    }
-
-    public string Name { get; }
-
-    public IDataSource Source { get; }
-
-    public TimeSpan Timeout { get; }
-}
-
 /// <summary>
 /// Tries the primary provider, then the secondary, then the last-known-good items, each fetch under its provider's timeout.
 /// Live answers are stored for later fallbacks and kept for the last-known-good lifetime. Caller cancellation and provider bugs still throw.

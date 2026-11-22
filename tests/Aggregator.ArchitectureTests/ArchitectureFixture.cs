@@ -16,6 +16,8 @@ internal static class ArchitectureFixture
     public static readonly Assembly InfrastructureAssembly = typeof(InfrastructureServiceCollectionExtensions).Assembly;
     public static readonly Assembly ApiAssembly = typeof(Program).Assembly;
 
+    public static readonly Assembly[] ProductionAssemblies = [DomainAssembly, ApplicationAssembly, InfrastructureAssembly, ApiAssembly];
+
     /// <summary>Loaded so rules against logging types match something instead of passing vacuously.</summary>
     public static readonly Assembly LoggingAbstractionsAssembly = typeof(ILogger).Assembly;
 
@@ -25,5 +27,5 @@ internal static class ArchitectureFixture
     public const string EndpointsNamespacePattern = @"^Aggregator\.Api\.Endpoints(\..+)?$";
 
     public static readonly Architecture Architecture =
-        new ArchLoader().LoadAssemblies(DomainAssembly, ApplicationAssembly, InfrastructureAssembly, ApiAssembly, LoggingAbstractionsAssembly, HttpAssembly).Build();
+        new ArchLoader().LoadAssemblies([.. ProductionAssemblies, LoggingAbstractionsAssembly, HttpAssembly]).Build();
 }

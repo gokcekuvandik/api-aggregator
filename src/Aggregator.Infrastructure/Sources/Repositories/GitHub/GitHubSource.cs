@@ -1,7 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Net.Http.Headers;
-using System.Text.Json.Serialization;
 using Aggregator.Application.Aggregation;
 using Aggregator.Application.Sources;
 using Aggregator.Domain.Items;
@@ -9,21 +7,6 @@ using Aggregator.Infrastructure.Sources.Relevance;
 using Microsoft.Extensions.Options;
 
 namespace Aggregator.Infrastructure.Sources.Repositories.GitHub;
-
-internal sealed class GitHubOptions : DataSourceOptions
-{
-    public GitHubOptions() => BaseAddress = new Uri("https://api.github.com/");
-
-    [Required]
-    public string Query { get; set; } = "topic:dotnet";
-
-    [Range(1, 100)]
-    public int MaxItems { get; set; } = 20;
-
-    /// <summary>Optional; without it requests are anonymous and have a lower rate limit.</summary>
-    [RegularExpression(HeaderSafePattern, ErrorMessage = HeaderSafeMessage)]
-    public string? Token { get; set; }
-}
 
 /// <summary>
 /// Repositories matching a GitHub search: the configured query sorted by stars, or the request's text by best match.
@@ -80,23 +63,3 @@ internal sealed class GitHubSource(SourceFetcher fetcher, IOptions<GitHubOptions
         Relevance: relevance,
         Details: new RepositoryDetails(repository.StargazersCount, repository.ForksCount, repository.Language));
 }
-
-internal sealed record GitHubSearch(IReadOnlyList<GitHubRepository> Items);
-
-internal sealed record GitHubRepository(
-    long Id,
-    string FullName,
-    DateTimeOffset UpdatedAt,
-    string? HtmlUrl = null,
-    string? Description = null,
-    double Score = 0,
-    int StargazersCount = 0,
-    int ForksCount = 0,
-    string? Language = null);
-
-[JsonSourceGenerationOptions(
-    PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower,
-    RespectNullableAnnotations = true,
-    RespectRequiredConstructorParameters = true)]
-[JsonSerializable(typeof(GitHubSearch))]
-internal sealed partial class GitHubJsonContext : JsonSerializerContext;

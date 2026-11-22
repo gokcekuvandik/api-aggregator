@@ -21,7 +21,7 @@ tests/
   Aggregator.AppHost.UnitTests
   Aggregator.Api.IntegrationTests
   Aggregator.EndToEndTests      the real AppHost against WireMock upstreams
-  Aggregator.ArchitectureTests  dependency rule, Domain purity, endpoint and test-name conventions
+  Aggregator.ArchitectureTests  dependency rule, Domain purity, endpoint, code, model and test-name conventions
 ```
 
 The dependency rule is enforced, not just documented: `Aggregator.ArchitectureTests` fails when a layer depends outward (ArchUnitNET) or when Domain references an assembly that does not load from the shared framework.
@@ -268,6 +268,7 @@ Each decision was recorded as an architecture decision record (MADR 4). The reco
 | 0012 | Runtime: .NET 11 |
 | 0013 | Topology: stateless modular monolith (below) |
 | 0014 | Testing strategy and development method (see Testing) |
+| 0015 | Code conventions (see Code conventions) |
 
 ### Topology and scaling (ADR-0013)
 
@@ -276,7 +277,7 @@ One stateless service, deployable as N replicas. There is no database, no messag
 | Concern | One instance (default) | Scaled out |
 |---|---|---|
 | Source cache | HybridCache, in memory | Redis as the second level once `ConnectionStrings:cache` is set; no code changes |
-| `/api/v1/statistics` | in memory, per instance | still per instance, so two calls behind a load balancer can differ; the cluster view is the OpenTelemetry metrics, summed in Prometheus |
+| `/api/v1/statistics` | in memory, per instance, reset on restart | still per instance, so two calls behind a load balancer can differ; the cluster view and the history are the OpenTelemetry metrics, summed and kept in Prometheus |
 | Anomaly detection | per instance | the Grafana alert rule sums every instance's metrics, so it covers the cluster |
 | Inbound rate limit | per instance | a gateway owns distributed limits |
 
@@ -318,7 +319,7 @@ Test names follow `Subject_ShouldOutcome_WhenCondition`; an unconditional rule d
 | Unit | `Domain`, `Application`, `Infrastructure`, `AppHost` `.UnitTests` | xUnit v3 on Microsoft.Testing.Platform, Shouldly, NSubstitute, MockHttp, `FakeLogger`, `MetricCollector<T>`, `FakeTimeProvider` |
 | Integration | `Aggregator.Api.IntegrationTests` | `WebApplicationFactory`, WireMock.Net for latency, faults and 429, `JsonSnapshot` contract snapshots |
 | End to end | `Aggregator.EndToEndTests` | `Aspire.Hosting.Testing` starts the real AppHost and API process, with every source pointed at WireMock and a test signing key |
-| Architecture | `Aggregator.ArchitectureTests` | ArchUnitNET and Roslyn: layer rules, Domain purity, endpoint and telemetry conventions, topology, test names |
+| Architecture | `Aggregator.ArchitectureTests` | ArchUnitNET and Roslyn: layer rules, Domain purity, endpoint, telemetry, code and model conventions, topology, test names |
 
 How the cases were chosen:
 
@@ -335,6 +336,23 @@ How the cases were chosen:
 Coverage is measured in CI. `build/coverage.sh` merges the Cobertura files with ReportGenerator, writes the summary to the job page, and fails the build below **80% of lines**. Source-generated code (JSON contexts, logging, OpenAPI, validation) is left out when coverage is collected (`coverage.settings.xml`). Last run: **98.9% of lines, 94.7% of branches**, or 81.1% of lines if generated code is counted.
 
 Mutation testing with Stryker.NET was run once: Domain 95.8%, Application 80.7%, Infrastructure 84.2% ([results and what survives](benchmarks/Results/MutationScore.md)). It is not part of CI, because it takes minutes per project.
+
+## Code conventions (ADR-0015)
+
+Each convention is an architecture test, so a break fails `dotnet test` with the file and line or the type name.
+
+| Convention | Rule | Exceptions |
+|---|---|---|
+| One type per file | a file under `src/` declares exactly one top-level type, named after the file (`CodeConventionTests`, Roslyn) | `Program.cs` top-level statements, nested types |
+| Sealed models | every record is `sealed` or `abstract` (`ModelConventionTests`, reflection) | none |
+| Init-only models | no public setter | `*Options` types, which the configuration binder fills |
+| Contract suffix | public types in `Aggregator.Api.Contracts` end in `Request` or `Response` | enums |
+| Application boundary | types an application service or reader takes or returns end in `Query` or `Result` | interfaces, enums, Domain types |
+| Message classes | a user-facing message (400 body, ProblemDetails title or detail, `sources[].error`, options-validation failure) comes from a `*Messages` or `*Titles` class | programmer invariants such as `UnreachableException` |
+
+Message classes are one per layer and area: `Api/Contracts/ValidationMessages`, `Api/Http/ProblemTitles`, `Api/Security/OptionsValidationMessages`, `Application/Aggregation/ValidationMessages`, `Application/Sources/SourceFailureMessages` and `Infrastructure/OptionsValidationMessages`. A message with values is a static method, such as `ValidationMessages.UnknownSource(name, known)`, so the template and its arguments stay together.
+
+The message rule checks the known call shapes (`ValidationResult`, `SourceFailure`, ProblemDetails, error dictionaries, options validation), not every string in the code.
 
 ## Build and run
 

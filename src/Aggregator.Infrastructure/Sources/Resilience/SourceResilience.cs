@@ -85,9 +85,7 @@ internal static class SourceResilience
             var total = resilience.Get(OptionsName(clientName)).TotalRequestTimeout.Timeout;
             return options.Timeout > total
                 ? ValidateOptionsResult.Success
-                : ValidateOptionsResult.Fail(
-                    $"{section}:{nameof(DataSourceOptions.Timeout)} ({options.Timeout}) must be longer than " +
-                    $"{ResilienceSection(section)}:TotalRequestTimeout:Timeout ({total}).");
+                : ValidateOptionsResult.Fail(OptionsValidationMessages.TimeoutWithinPipeline(section, options.Timeout, ResilienceSection(section), total));
         }
     }
 }

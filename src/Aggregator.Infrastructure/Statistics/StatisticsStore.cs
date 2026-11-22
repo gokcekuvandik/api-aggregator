@@ -26,7 +26,7 @@ internal sealed class StatisticsStore : IStatisticsReader
     public void RecordCacheHit(UpstreamApi api) => For(api).RecordCacheHit();
 
     /// <summary>Ordered by source, with the primary provider before secondaries.</summary>
-    public IReadOnlyList<ApiStatisticsSnapshot> GetSnapshots()
+    public IReadOnlyList<ApiStatisticsResult> GetSnapshots()
     {
         var now = _time.GetUtcNow();
         return

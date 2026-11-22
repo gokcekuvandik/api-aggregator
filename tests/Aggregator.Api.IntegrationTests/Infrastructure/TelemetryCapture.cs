@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
-using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 

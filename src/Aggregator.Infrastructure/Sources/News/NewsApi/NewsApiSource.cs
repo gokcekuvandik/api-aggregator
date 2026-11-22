@@ -1,22 +1,11 @@
-using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text;
-using System.Text.Json.Serialization;
 using Aggregator.Application.Aggregation;
 using Aggregator.Application.Sources;
 using Aggregator.Infrastructure.Sources.Relevance;
 using Microsoft.Extensions.Options;
 
 namespace Aggregator.Infrastructure.Sources.News.NewsApi;
-
-internal sealed class NewsApiOptions : NewsOptions
-{
-    public NewsApiOptions() => BaseAddress = new Uri("https://newsapi.org/");
-
-    [Required]
-    [RegularExpression(HeaderSafePattern, ErrorMessage = HeaderSafeMessage)]
-    public string? ApiKey { get; set; }
-}
 
 /// <summary>
 /// Articles from NewsAPI; used instead of Hacker News when an API key is configured.
@@ -76,22 +65,3 @@ internal sealed class NewsApiSource(SourceFetcher fetcher, IOptions<NewsApiOptio
         Author: article.Author,
         Publisher: article.Source?.Name);
 }
-
-internal sealed record NewsApiResponse(IReadOnlyList<NewsApiArticle> Articles);
-
-internal sealed record NewsApiArticle(
-    DateTimeOffset PublishedAt,
-    string? Title = null,
-    string? Description = null,
-    string? Url = null,
-    string? Author = null,
-    NewsApiPublisher? Source = null);
-
-internal sealed record NewsApiPublisher(string? Name = null);
-
-[JsonSourceGenerationOptions(
-    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
-    RespectNullableAnnotations = true,
-    RespectRequiredConstructorParameters = true)]
-[JsonSerializable(typeof(NewsApiResponse))]
-internal sealed partial class NewsApiJsonContext : JsonSerializerContext;
