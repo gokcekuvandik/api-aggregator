@@ -491,3 +491,9 @@ TestResults/
 
 # JSON snapshot tests: review, then rename to .verified.json
 *.received.json
+
+# Stryker.NET mutation reports (dotnet stryker without --output)
+StrykerOutput/
+
+# Coverage collection settings are source, unlike the coverage*.xml outputs ignored above
+!coverage.settings.xml

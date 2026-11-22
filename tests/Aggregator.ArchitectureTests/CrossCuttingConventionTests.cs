@@ -8,7 +8,7 @@ namespace Aggregator.ArchitectureTests;
 public sealed class CrossCuttingConventionTests
 {
     [Fact]
-    public void Endpoints_ShouldNotDependOn_Logging() =>
+    public void Endpoints_ShouldNotDependOnLogging() =>
         Types().That().ResideInNamespaceMatching(EndpointsNamespacePattern)
             .Should().NotDependOnAny(Types().That().ResideInNamespace("Microsoft.Extensions.Logging"))
             .Check(Architecture);

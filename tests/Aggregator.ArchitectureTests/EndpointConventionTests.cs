@@ -21,7 +21,7 @@ public sealed class EndpointConventionTests
             .Check(Architecture);
 
     [Fact]
-    public void Endpoints_ShouldNotDependOn_Infrastructure() =>
+    public void Endpoints_ShouldNotDependOnInfrastructure() =>
         Types().That().ResideInNamespaceMatching(EndpointsNamespacePattern)
             .Should().NotDependOnAny(Types().That().ResideInAssembly(InfrastructureAssembly))
             .Check(Architecture);

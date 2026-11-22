@@ -60,6 +60,11 @@ public sealed class ItemOrderingTests
     }
 
     [Fact]
+    public void Sort_ShouldThrow_WhenDirectionIsUnknown() =>
+        Should.Throw<ArgumentOutOfRangeException>(() => ItemOrdering.Sort([TestItems.Item("a")], ItemSortField.Date, (SortDirection)99))
+            .ParamName.ShouldBe("direction");
+
+    [Fact]
     public void Sort_ShouldOrderSourcesIgnoringCase_WhenSortingBySource()
     {
         AggregatedItem[] items = [TestItems.Item("b", source: "Weather"), TestItems.Item("a", source: "news")];

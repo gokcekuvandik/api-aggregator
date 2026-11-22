@@ -15,7 +15,7 @@ public sealed class LayerDependencyTests
     private static readonly GivenTypesConjunctionWithDescription ApiLayer = Layer(ApiAssembly, "Api layer");
 
     [Fact]
-    public void Domain_ShouldNotDependOn_AnyOtherLayer() =>
+    public void Domain_ShouldNotDependOnAnyOtherLayer() =>
         DomainLayer.Should()
             .NotDependOnAny(ApplicationLayer).AndShould()
             .NotDependOnAny(InfrastructureLayer).AndShould()
@@ -23,14 +23,14 @@ public sealed class LayerDependencyTests
             .Check(Architecture);
 
     [Fact]
-    public void Application_ShouldNotDependOn_InfrastructureOrApi() =>
+    public void Application_ShouldNotDependOnInfrastructureOrApi() =>
         ApplicationLayer.Should()
             .NotDependOnAny(InfrastructureLayer).AndShould()
             .NotDependOnAny(ApiLayer)
             .Check(Architecture);
 
     [Fact]
-    public void Infrastructure_ShouldNotDependOn_Api() =>
+    public void Infrastructure_ShouldNotDependOnApi() =>
         InfrastructureLayer.Should()
             .NotDependOnAny(ApiLayer)
             .Check(Architecture);

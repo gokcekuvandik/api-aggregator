@@ -13,7 +13,7 @@ public sealed class DomainPurityTests
     private static readonly string RuntimeDirectory = Path.TrimEndingDirectorySeparator(RuntimeEnvironment.GetRuntimeDirectory());
 
     [Fact]
-    public void Domain_ShouldReference_OnlySharedFrameworkAssemblies()
+    public void Domain_ShouldReferenceOnlySharedFrameworkAssemblies()
     {
         var nonFrameworkReferences = DomainAssembly.GetReferencedAssemblies()
             .Select(Assembly.Load)

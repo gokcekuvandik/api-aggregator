@@ -169,6 +169,24 @@ public sealed class OpenMeteoSourceTests : IDisposable
     public void Describe_ShouldNameConditions_WhenGivenWmoCode(int? code, string expected) =>
         WmoWeatherCodes.Describe(code).ShouldBe(expected);
 
+    [Theory]
+    [InlineData(50, "unknown conditions")]
+    [InlineData(51, "drizzle")]
+    [InlineData(57, "drizzle")]
+    [InlineData(58, "unknown conditions")]
+    [InlineData(61, "rain")]
+    [InlineData(67, "rain")]
+    [InlineData(71, "snow")]
+    [InlineData(77, "snow")]
+    [InlineData(80, "rain showers")]
+    [InlineData(82, "rain showers")]
+    [InlineData(83, "unknown conditions")]
+    [InlineData(94, "unknown conditions")]
+    [InlineData(99, "thunderstorm")]
+    [InlineData(100, "unknown conditions")]
+    public void Describe_ShouldIncludeBothEdges_WhenCodeIsOnARangeBoundary(int code, string expected) =>
+        WmoWeatherCodes.Describe(code).ShouldBe(expected);
+
     private static readonly DateTimeOffset FirstForecastDay = new(2026, 11, 21, 0, 0, 0, TimeSpan.Zero);
 
     private OpenMeteoSource Source(OpenMeteoOptions options) =>

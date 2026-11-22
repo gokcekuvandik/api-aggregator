@@ -50,9 +50,7 @@ public sealed class AggregationServiceTests : IDisposable
     [Fact]
     public async Task AggregateAsync_ShouldRecordAnError_WhenASourceThrows()
     {
-        var broken = Substitute.For<IDataSource>();
-        broken.Name.Returns("broken");
-        broken.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns<SourceResult>(_ => throw new InvalidOperationException("bug"));
+        var broken = TestSources.Throwing("broken", new InvalidOperationException("bug"));
 
         await Should.ThrowAsync<InvalidOperationException>(() => Service(broken).AggregateAsync(DefaultQuery, TestContext.Current.CancellationToken));
 
@@ -233,6 +231,26 @@ public sealed class AggregationServiceTests : IDisposable
         }
 
         (await pendingToken.Task).IsCancellationRequested.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task AggregateAsync_ShouldThrowWithoutCallingAnySource_WhenQueryIsInvalid()
+    {
+        var news = Source("news", new SourceSuccess([]));
+
+        await Should.ThrowAsync<ArgumentException>(() =>
+            Service(news).AggregateAsync(DefaultQuery with { Sources = ["nope"] }, TestContext.Current.CancellationToken));
+
+        await news.DidNotReceive().FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void AggregationDuration_ShouldBeInSecondsWithFixedBuckets_WhenTheTelemetryIsCreated()
+    {
+        var histogram = _durations.Instrument.ShouldBeOfType<System.Diagnostics.Metrics.Histogram<double>>();
+
+        histogram.Unit.ShouldBe("s");
+        histogram.Advice.ShouldNotBeNull().HistogramBucketBoundaries.ShouldBe([0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]);
     }
 
     [Fact]

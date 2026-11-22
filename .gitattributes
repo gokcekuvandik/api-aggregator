@@ -1,2 +1,5 @@
 # Text files check out with CRLF on every OS so .editorconfig (end_of_line = crlf) holds in CI too; the index keeps LF.
 * text=auto eol=crlf
+
+# Shell scripts run on Linux runners, where CRLF breaks the interpreter line.
+*.sh text eol=lf

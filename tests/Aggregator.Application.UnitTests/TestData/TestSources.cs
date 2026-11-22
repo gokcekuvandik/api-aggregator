@@ -17,6 +17,17 @@ internal static class TestSources
         return source;
     }
 
+    /// <summary>A source whose fetch throws, standing in for a bug in an adapter.</summary>
+    public static IDataSource Throwing(string name, Exception exception)
+    {
+        var source = Substitute.For<IDataSource>();
+        source.Name.Returns(name);
+        source.Categories.Returns([name]);
+        source.UsedFields.Returns(SearchFields.All);
+        source.FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>()).Returns<SourceResult>(_ => throw exception);
+        return source;
+    }
+
     /// <summary>A source whose fetch only ends when its token is cancelled.</summary>
     public static IDataSource Hanging(string name)
     {

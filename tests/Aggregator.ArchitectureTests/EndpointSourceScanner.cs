@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -11,14 +10,9 @@ namespace Aggregator.ArchitectureTests;
 /// </summary>
 internal static class EndpointSourceScanner
 {
-    public static IReadOnlyList<string> EndpointFiles([CallerFilePath] string callerFile = "")
-    {
-        var testDirectory = Path.GetDirectoryName(callerFile)
-            ?? throw new InvalidOperationException($"Cannot resolve the directory of '{callerFile}'.");
-        var endpointsDirectory = Path.GetFullPath(Path.Combine(testDirectory, "..", "..", "src", "Aggregator.Api", "Endpoints"));
-
-        return [.. Directory.EnumerateFiles(endpointsDirectory, "*.cs", SearchOption.AllDirectories).Order(StringComparer.Ordinal)];
-    }
+    public static IReadOnlyList<string> EndpointFiles() =>
+        [.. Directory.EnumerateFiles(Path.Combine(RepositoryPaths.Root(), "src", "Aggregator.Api", "Endpoints"), "*.cs", SearchOption.AllDirectories)
+            .Order(StringComparer.Ordinal)];
 
     /// <summary>One <c>file:line</c> entry per <c>try</c> statement in the source.</summary>
     public static IReadOnlyList<string> FindTryStatements(string source, string path) =>
