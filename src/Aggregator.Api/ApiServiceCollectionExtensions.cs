@@ -3,6 +3,7 @@ using Aggregator.Api.Http;
 using Aggregator.Api.Security;
 using Asp.Versioning;
 using Microsoft.AspNetCore.HttpLogging;
+using Microsoft.OpenApi;
 
 namespace Aggregator.Api;
 
@@ -40,9 +41,12 @@ internal static class ApiServiceCollectionExtensions
                 options.SubstituteApiVersionInUrl = true;
             });
 
-        services.AddOpenApi("v1", options => options
-            .AddDocumentTransformer<BearerSecurityTransformer>()
-            .AddOperationTransformer<BearerSecurityTransformer>());
+        services.AddOpenApi("v1", options =>
+        {
+            options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_2;
+            options.AddDocumentTransformer<BearerSecurityTransformer>()
+                .AddOperationTransformer<BearerSecurityTransformer>();
+        });
 
         return services;
     }

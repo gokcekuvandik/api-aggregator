@@ -10,6 +10,14 @@ public sealed class OpenApiContractTests(AggregatorApiFactory factory) : IClassF
     private static readonly string[] SecurityStatuses = ["401", "403", "429"];
 
     [Fact]
+    public async Task Document_ShouldDeclareOpenApi32_WhenServed()
+    {
+        var document = await GetDocumentAsync();
+
+        document.GetProperty("openapi").GetString().ShouldBe("3.2.0");
+    }
+
+    [Fact]
     public async Task AggregationParameters_ShouldUseWireNames_WhenDocumented()
     {
         var document = await GetDocumentAsync();
