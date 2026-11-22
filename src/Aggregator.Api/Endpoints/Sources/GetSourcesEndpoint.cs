@@ -1,4 +1,5 @@
 using Aggregator.Api.Contracts;
+using Aggregator.Api.Security;
 using Aggregator.Application.Sources;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -9,6 +10,7 @@ public sealed class GetSourcesEndpoint : IEndpoint
     public void Map(IEndpointRouteBuilder group) =>
         group.MapGet("/sources", Handle)
             .WithName("GetSources")
+            .RequireAuthorization(ApiScopes.AggregationRead)
             .WithSummary("The registered data sources and their categories");
 
     private static Ok<SourcesResponse> Handle(DataSourceRegistry registry) =>

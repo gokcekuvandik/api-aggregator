@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Aggregator.Api.Http;
+using Aggregator.Api.Security;
 using Asp.Versioning;
 using Microsoft.AspNetCore.HttpLogging;
 
@@ -39,7 +40,9 @@ internal static class ApiServiceCollectionExtensions
                 options.SubstituteApiVersionInUrl = true;
             });
 
-        services.AddOpenApi("v1");
+        services.AddOpenApi("v1", options => options
+            .AddDocumentTransformer<BearerSecurityTransformer>()
+            .AddOperationTransformer<BearerSecurityTransformer>());
 
         return services;
     }

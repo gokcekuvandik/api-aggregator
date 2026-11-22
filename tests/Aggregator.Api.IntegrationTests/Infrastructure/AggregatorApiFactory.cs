@@ -1,5 +1,7 @@
+using System.Net.Http.Headers;
 using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -15,6 +17,11 @@ namespace Aggregator.Api.IntegrationTests.Infrastructure;
 /// <summary>Hosts the API in memory and swaps the real sources for stubs.</summary>
 public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
 {
+    /// <summary>Valid for an hour, far longer than a test run.</summary>
+    private static readonly string DefaultToken = TestTokens.Create(TestTokens.AllScopes);
+
+    private WebApplicationFactory<Program>? _securedHost;
+
     public HttpClient CreateClientWith(params IDataSource[] sources) =>
         Create(services => ReplaceSources(services, sources));
 
@@ -65,9 +72,45 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
         return (host.CreateClient(), host.Services);
     }
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder) =>
+    /// <summary>One Production host with a stub news source, shared by tests that vary only the token or the route.</summary>
+    public WebApplicationFactory<Program> SecuredHost => _securedHost ??= HostWith(sources: StubDataSource.InState("news", "Success"));
+
+    /// <summary>
+    /// A Production host with <paramref name="settings"/> applied on top of the test defaults, and <paramref name="sources"/> in place of the real ones when given.
+    /// Several clients of one host share its rate limiter; <see cref="TokenClients.CreateClientWithToken"/> picks each client's token.
+    /// </summary>
+    public WebApplicationFactory<Program> HostWith(IReadOnlyDictionary<string, string?>? settings = null, params IDataSource[] sources) =>
+        Host(
+            services =>
+            {
+                if (sources.Length > 0)
+                {
+                    ReplaceSources(services, sources);
+                }
+            },
+            Environments.Production,
+            logs: null,
+            settings);
+
+    /// <summary>Every host trusts the test signing key and allows far more requests than any test sends, unless a test overrides it.</summary>
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        foreach (var (key, value) in DefaultSettings)
+        {
+            builder.UseSetting(key, value);
+        }
+
         builder.ConfigureTestServices(services =>
             services.ConfigureHttpClientDefaults(http => http.AddHttpMessageHandler(() => new LoopbackOnlyHandler())));
+    }
+
+    /// <summary>Every client signs in with both scopes unless a test replaces the header.</summary>
+    protected override void ConfigureClient(HttpClient client)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        base.ConfigureClient(client);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(JwtBearerDefaults.AuthenticationScheme, DefaultToken);
+    }
 
     private HttpClient Create(
         Action<IServiceCollection> configure,
@@ -94,6 +137,9 @@ public sealed class AggregatorApiFactory : WebApplicationFactory<Program>
                     builder.ConfigureLogging(logging => logging.AddProvider(logs));
                 }
             });
+
+    private static IEnumerable<KeyValuePair<string, string?>> DefaultSettings =>
+        TestTokens.Settings.Append(new("RateLimiting:TokenLimit", "100000"));
 
     private static void ReplaceSources(IServiceCollection services, IDataSource[] sources)
     {

@@ -1,6 +1,7 @@
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using Aggregator.Api.Contracts;
+using Aggregator.Api.Security;
 using Aggregator.Application.Aggregation;
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -20,6 +21,7 @@ public sealed class GetAggregationStreamEndpoint : IEndpoint
     public void Map(IEndpointRouteBuilder group) =>
         group.MapGet("/aggregation/stream", Handle)
             .WithName("GetAggregationStream")
+            .RequireAuthorization(ApiScopes.AggregationRead)
             .WithSummary("Aggregated items streamed per source")
             .WithDescription(Description)
             .ProducesValidationProblem();
