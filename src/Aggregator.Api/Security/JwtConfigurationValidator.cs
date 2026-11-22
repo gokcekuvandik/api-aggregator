@@ -6,10 +6,6 @@ namespace Aggregator.Api.Security;
 /// <summary>Stops startup when the bearer scheme could not validate any token, instead of answering 401 to every request.</summary>
 internal sealed class JwtConfigurationValidator : IValidateOptions<JwtBearerOptions>
 {
-    private const string Failure =
-        "Authentication:Schemes:Bearer needs ValidAudiences, and either an Authority or a ValidIssuer with SigningKeys. " +
-        "For development run: dotnet user-jwts create --project src/Aggregator.Api --scope aggregation:read --scope stats:read";
-
     public ValidateOptionsResult Validate(string? name, JwtBearerOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -24,7 +20,7 @@ internal sealed class JwtConfigurationValidator : IValidateOptions<JwtBearerOpti
         var hasLocalKeys = HasAny([parameters.ValidIssuer, .. parameters.ValidIssuers ?? []])
             && (parameters.IssuerSigningKeys?.Any() ?? false);
 
-        return hasAudience && (hasAuthority || hasLocalKeys) ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(Failure);
+        return hasAudience && (hasAuthority || hasLocalKeys) ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(OptionsValidationMessages.UnusableBearerScheme);
     }
 
     private static bool HasAny(IEnumerable<string?> values) => values.Any(value => !string.IsNullOrWhiteSpace(value));

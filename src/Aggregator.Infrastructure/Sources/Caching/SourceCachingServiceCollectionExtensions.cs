@@ -39,9 +39,9 @@ internal static class SourceCachingServiceCollectionExtensions
             .Configure(options => options.Ttl = SourceCacheOptions.DefaultTtlFor(sourceName))
             .BindConfiguration(cacheSection)
             .Validate(options => InRange(options.Ttl, SourceCacheOptions.MinTtl, SourceCacheOptions.MaxTtl),
-                $"{cacheSection}:{nameof(SourceCacheOptions.Ttl)} must be from {SourceCacheOptions.MinTtl} to {SourceCacheOptions.MaxTtl}.")
+                OptionsValidationMessages.OutOfRange(cacheSection, nameof(SourceCacheOptions.Ttl), SourceCacheOptions.MinTtl, SourceCacheOptions.MaxTtl))
             .Validate(options => InRange(options.LastKnownGoodTtl, SourceCacheOptions.MinLastKnownGoodTtl, SourceCacheOptions.MaxLastKnownGoodTtl),
-                $"{cacheSection}:{nameof(SourceCacheOptions.LastKnownGoodTtl)} must be from {SourceCacheOptions.MinLastKnownGoodTtl} to {SourceCacheOptions.MaxLastKnownGoodTtl}.")
+                OptionsValidationMessages.OutOfRange(cacheSection, nameof(SourceCacheOptions.LastKnownGoodTtl), SourceCacheOptions.MinLastKnownGoodTtl, SourceCacheOptions.MaxLastKnownGoodTtl))
             .ValidateOnStart();
         return services;
     }

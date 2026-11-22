@@ -28,7 +28,7 @@ public sealed class AggregationService(DataSourceRegistry registry, AggregationT
         if (unknownSources.Count > 0)
         {
             var known = string.Join(", ", registry.All.Select(source => source.Name));
-            errors[nameof(AggregationQuery.Sources)] = [.. unknownSources.Select(name => $"Unknown source '{name}'. Known sources: {known}.")];
+            errors[nameof(AggregationQuery.Sources)] = [.. unknownSources.Select(name => ValidationMessages.UnknownSource(name, known))];
         }
 
         if (query.Category is { } category)
@@ -36,11 +36,11 @@ public sealed class AggregationService(DataSourceRegistry registry, AggregationT
             if (!registry.All.Any(source => Serves(source, category)))
             {
                 var known = string.Join(", ", registry.All.SelectMany(source => source.Categories).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal));
-                errors[nameof(AggregationQuery.Category)] = [$"Unknown category '{category}'. Known categories: {known}."];
+                errors[nameof(AggregationQuery.Category)] = [ValidationMessages.UnknownCategory(category, known)];
             }
             else if (unknownSources.Count == 0 && Select(query).Count == 0)
             {
-                errors[nameof(AggregationQuery.Category)] = [$"None of the selected sources serves category '{category}'."];
+                errors[nameof(AggregationQuery.Category)] = [ValidationMessages.CategoryNotServed(category)];
             }
         }
 
@@ -64,7 +64,7 @@ public sealed class AggregationService(DataSourceRegistry registry, AggregationT
     /// Yields each selected source as soon as it completes, fastest first, with its items filtered and sorted but not paged.
     /// Throws like <see cref="AggregateAsync"/> for a query that fails <see cref="Validate"/>.
     /// </summary>
-    public async IAsyncEnumerable<SourceUpdate> StreamAsync(AggregationQuery query, [EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<SourceUpdateResult> StreamAsync(AggregationQuery query, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         EnsureValid(query);
 
@@ -81,7 +81,7 @@ public sealed class AggregationService(DataSourceRegistry registry, AggregationT
             {
                 var report = await completed;
                 reports.Add(report);
-                yield return new SourceUpdate(report, FilterAndSort(report.Result.Items, query));
+                yield return new SourceUpdateResult(report, FilterAndSort(report.Result.Items, query));
             }
 
             run.Completed(reports);

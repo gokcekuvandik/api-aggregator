@@ -1,5 +1,4 @@
 using System.Diagnostics.Metrics;
-using Aggregator.Application.Sources;
 using Aggregator.Application.Statistics;
 using Aggregator.Application.Telemetry;
 using Aggregator.Infrastructure.Statistics;
@@ -213,7 +212,7 @@ public sealed class AnomalyDetectorTests : IDisposable
         _services.Dispose();
     }
 
-    private static ApiStatisticsSnapshot Snapshot(UpstreamApi api, double overallMs, double windowMs, long windowCount) =>
+    private static ApiStatisticsResult Snapshot(UpstreamApi api, double overallMs, double windowMs, long windowCount) =>
         new(
             api,
             TotalRequests: 1_000,
@@ -233,13 +232,13 @@ public sealed class AnomalyDetectorTests : IDisposable
     private sealed class StubReader : IStatisticsReader
     {
         private readonly Lock _lock = new();
-        private IReadOnlyList<ApiStatisticsSnapshot> _snapshots = [];
+        private IReadOnlyList<ApiStatisticsResult> _snapshots = [];
         private Exception? _failure;
         private int _calls;
 
         public int Calls => Volatile.Read(ref _calls);
 
-        public void Set(params ApiStatisticsSnapshot[] snapshots)
+        public void Set(params ApiStatisticsResult[] snapshots)
         {
             lock (_lock)
             {
@@ -255,7 +254,7 @@ public sealed class AnomalyDetectorTests : IDisposable
             }
         }
 
-        public IReadOnlyList<ApiStatisticsSnapshot> GetSnapshots()
+        public IReadOnlyList<ApiStatisticsResult> GetSnapshots()
         {
             lock (_lock)
             {

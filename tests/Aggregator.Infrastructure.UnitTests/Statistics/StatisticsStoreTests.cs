@@ -290,7 +290,7 @@ public sealed class StatisticsStoreTests
     };
 
     /// <summary>The buckets add up to the totals, and the overall average lies between the smallest and largest bucket average.</summary>
-    private static bool IsConsistent(ApiStatisticsSnapshot snapshot)
+    private static bool IsConsistent(ApiStatisticsResult snapshot)
     {
         BucketStatistics[] buckets = [snapshot.Fast, snapshot.Average, snapshot.Slow];
         var used = buckets.Where(b => b.Count > 0).ToList();

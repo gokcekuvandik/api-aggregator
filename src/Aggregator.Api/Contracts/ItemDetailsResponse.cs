@@ -20,10 +20,3 @@ public abstract record ItemDetailsResponse
         _ => throw new UnreachableException($"Unknown item details {details.GetType().Name}."),
     };
 }
-
-/// <summary>Temperatures are in °C.</summary>
-public sealed record WeatherDetailsResponse(string Location, double? MinTemperature, double? MaxTemperature, string Conditions) : ItemDetailsResponse;
-
-public sealed record NewsDetailsResponse(string? Author, int? Points, string? Publisher) : ItemDetailsResponse;
-
-public sealed record RepositoryDetailsResponse(int Stars, int Forks, string? Language) : ItemDetailsResponse;

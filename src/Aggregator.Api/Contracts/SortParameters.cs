@@ -29,10 +29,10 @@ internal static class SortParameters
         TryParse(value, Directions, SortDirection.Descending, out direction);
 
     public static ItemSortField ParseField(string? value) =>
-        TryParseField(value, out var field) ? field : throw new ArgumentException($"sortBy must be one of: {FieldNames}.", nameof(value));
+        TryParseField(value, out var field) ? field : throw new ArgumentException(ValidationMessages.InvalidSortField, nameof(value));
 
     public static SortDirection ParseDirection(string? value) =>
-        TryParseDirection(value, out var direction) ? direction : throw new ArgumentException($"sortOrder must be one of: {DirectionNames}.", nameof(value));
+        TryParseDirection(value, out var direction) ? direction : throw new ArgumentException(ValidationMessages.InvalidSortDirection, nameof(value));
 
     private static bool TryParse<T>(string? value, FrozenDictionary<string, T> names, T fallback, out T result)
         where T : struct

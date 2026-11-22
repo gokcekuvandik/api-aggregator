@@ -25,7 +25,7 @@ internal sealed partial class UnhandledExceptionHandler(
         await problemDetails.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
-            ProblemDetails = { Title = "An unexpected error occurred" },
+            ProblemDetails = { Title = ProblemTitles.UnexpectedError },
         });
         return true;
     }

@@ -1,25 +1,7 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Headers;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Aggregator.Infrastructure.Sources.Http;
-
-/// <summary>The last successful body for a URL and the ETag that identifies it.</summary>
-internal sealed record StoredResponse(EntityTagHeaderValue ETag, byte[] Body, string? MediaType);
-
-/// <summary>Stored responses by absolute URL, bounded by evicting the least recently used URL.</summary>
-internal sealed class ConditionalResponseStore(int capacity = ConditionalResponseStore.DefaultCapacity)
-{
-    public const int DefaultCapacity = 256;
-
-    private readonly LruStore<StoredResponse> _entries = new(capacity);
-
-    public bool TryGet(string key, [NotNullWhen(true)] out StoredResponse? response) => _entries.TryGet(key, out response);
-
-    public void Set(string key, StoredResponse response) => _entries.Set(key, response);
-}
 
 /// <summary>
 /// Sends <c>If-None-Match</c> with the stored ETag and turns a 304 back into a 200 with the stored body.
@@ -84,16 +66,5 @@ internal sealed class ConditionalRequestHandler(ConditionalResponseStore store) 
         }
 
         return replay;
-    }
-}
-
-internal static class ConditionalRequestExtensions
-{
-    /// <summary>Adds ETag revalidation to one source's client.</summary>
-    public static IHttpClientBuilder AddConditionalRequests(this IHttpClientBuilder builder)
-    {
-        builder.Services.TryAddSingleton<ConditionalResponseStore>();
-        builder.Services.TryAddTransient<ConditionalRequestHandler>();
-        return builder.AddHttpMessageHandler<ConditionalRequestHandler>();
     }
 }

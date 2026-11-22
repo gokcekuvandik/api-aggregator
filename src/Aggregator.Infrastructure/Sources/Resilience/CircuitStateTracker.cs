@@ -7,9 +7,6 @@ using Aggregator.Infrastructure.Statistics;
 
 namespace Aggregator.Infrastructure.Sources.Resilience;
 
-/// <summary>An external API whose circuit breaker state is reported, registered once per resilient client.</summary>
-internal sealed record TrackedCircuit(UpstreamApi Api);
-
 /// <summary>
 /// Holds each external API's circuit breaker state for the <c>aggregator.source.circuit_state</c> gauge: 0 closed, 1 half-open, 2 open.
 /// Every registered API reads closed from startup; opening also adds an event to the current span.

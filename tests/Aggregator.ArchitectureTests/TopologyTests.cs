@@ -1,6 +1,5 @@
 using System.Xml.Linq;
 using static Aggregator.ArchitectureTests.ArchitectureFixture;
-using Assembly = System.Reflection.Assembly;
 
 namespace Aggregator.ArchitectureTests;
 
@@ -22,8 +21,6 @@ public sealed class TopologyTests
         "Azure.Messaging.",
         "NServiceBus",
     ];
-
-    private static readonly Assembly[] ProductionAssemblies = [DomainAssembly, ApplicationAssembly, InfrastructureAssembly, ApiAssembly];
 
     [Fact]
     public void ProductionAssemblies_ShouldReferenceNoDatabaseOrBrokerClient()

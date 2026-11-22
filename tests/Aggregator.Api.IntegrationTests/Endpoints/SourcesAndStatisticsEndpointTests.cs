@@ -67,7 +67,7 @@ public sealed class SourcesAndStatisticsEndpointTests(AggregatorApiFactory facto
         (await response.ShouldBeJson(HttpStatusCode.OK)).GetProperty("items").GetArrayLength().ShouldBe(0);
     }
 
-    private static ApiStatisticsSnapshot Snapshot(UpstreamApi api, PerformanceBucket? performance) => new(
+    private static ApiStatisticsResult Snapshot(UpstreamApi api, PerformanceBucket? performance) => new(
         api,
         TotalRequests: 4,
         AverageDuration: TimeSpan.FromMilliseconds(125),
@@ -82,8 +82,8 @@ public sealed class SourcesAndStatisticsEndpointTests(AggregatorApiFactory facto
         CacheHits: 2,
         Recent: new WindowStatistics(TimeSpan.FromMinutes(5), 4, TimeSpan.FromMilliseconds(125)));
 
-    private sealed class StubStatisticsReader(params ApiStatisticsSnapshot[] snapshots) : IStatisticsReader
+    private sealed class StubStatisticsReader(params ApiStatisticsResult[] snapshots) : IStatisticsReader
     {
-        public IReadOnlyList<ApiStatisticsSnapshot> GetSnapshots() => snapshots;
+        public IReadOnlyList<ApiStatisticsResult> GetSnapshots() => snapshots;
     }
 }

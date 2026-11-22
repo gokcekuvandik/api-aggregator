@@ -5,10 +5,8 @@ using Aggregator.Application.Sources;
 using Aggregator.Infrastructure.Sources;
 using Aggregator.Infrastructure.Sources.Http;
 using Aggregator.Infrastructure.UnitTests.TestDoubles;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Options;
 using RichardSzalay.MockHttp;
 

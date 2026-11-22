@@ -8,7 +8,6 @@ namespace Aggregator.ArchitectureTests;
 internal static partial class TestNameScanner
 {
     private static readonly string[] TestAttributeSuffixes = ["Fact", "Theory"];
-    private static readonly string[] BuildOutputDirectories = ["bin", "obj"];
 
     private static readonly string TestsDirectory = Path.Combine(RepositoryPaths.Root(), "tests");
 
@@ -22,16 +21,7 @@ internal static partial class TestNameScanner
 
     public static IReadOnlyList<string> TestFiles() => SourceFiles("*.cs");
 
-    private static IReadOnlyList<string> SourceFiles(string pattern) =>
-        [.. Directory.EnumerateFiles(TestsDirectory, pattern, SearchOption.AllDirectories)
-            .Where(path => !IsBuildOutput(path))
-            .Order(StringComparer.Ordinal)];
-
-    // Only segments below tests/ count, so a checkout under a folder named bin or obj is still scanned.
-    private static bool IsBuildOutput(string path) =>
-        Path.GetRelativePath(TestsDirectory, path)
-            .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            .Any(segment => BuildOutputDirectories.Contains(segment, StringComparer.OrdinalIgnoreCase));
+    private static IReadOnlyList<string> SourceFiles(string pattern) => RepositoryPaths.SourceFiles(TestsDirectory, pattern);
 
     public static IReadOnlyList<TestMethod> FindTestMethods(string source, string path) =>
         [.. CSharpSyntaxTree.ParseText(source, path: path)

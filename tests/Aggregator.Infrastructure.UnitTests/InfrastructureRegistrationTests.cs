@@ -5,7 +5,6 @@ using Aggregator.Infrastructure.Sources.Repositories.GitHub;
 using Aggregator.Infrastructure.Sources.Weather.OpenMeteo;
 using Aggregator.Infrastructure.Sources.Weather.OpenWeatherMap;
 using Aggregator.Infrastructure.UnitTests.TestDoubles;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using RichardSzalay.MockHttp;

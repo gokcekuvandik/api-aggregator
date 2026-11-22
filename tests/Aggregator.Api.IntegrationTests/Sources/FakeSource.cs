@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using Aggregator.Application.Aggregation;
 using Aggregator.Application.Sources;
 using Aggregator.Domain.Items;

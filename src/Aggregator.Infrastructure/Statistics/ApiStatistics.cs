@@ -64,7 +64,7 @@ internal sealed class ApiStatistics(UpstreamApi api, PerformanceThresholds thres
         }
     }
 
-    public ApiStatisticsSnapshot Snapshot(DateTimeOffset now)
+    public ApiStatisticsResult Snapshot(DateTimeOffset now)
     {
         var buckets = new Tally[BucketCount];
         Tally recent = default;
@@ -85,7 +85,7 @@ internal sealed class ApiStatistics(UpstreamApi api, PerformanceThresholds thres
         }
 
         var total = buckets.Aggregate(default(Tally), (sum, tally) => sum.Add(tally));
-        return new ApiStatisticsSnapshot(
+        return new ApiStatisticsResult(
             api,
             total.Count,
             total.Average,

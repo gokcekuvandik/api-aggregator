@@ -1,7 +1,6 @@
 using Aggregator.Application.Sources;
 using Aggregator.Domain.Items;
 using Aggregator.Infrastructure.Sources.Relevance;
-using Aggregator.Infrastructure.Sources.Weather;
 using Aggregator.Infrastructure.Sources.Weather.OpenMeteo;
 using Aggregator.Infrastructure.UnitTests.TestDoubles;
 using Microsoft.Extensions.Options;

@@ -15,7 +15,7 @@ internal sealed class DataSourceOptionsValidator<TOptions>(string section) : IVa
         var results = new List<ValidationResult>();
         if (!Validator.TryValidateObject(options, new ValidationContext(options), results, validateAllProperties: true))
         {
-            failures.AddRange(results.Select(result => $"{section}: {result.ErrorMessage}"));
+            failures.AddRange(results.Select(result => OptionsValidationMessages.InSection(section, result.ErrorMessage)));
         }
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
@@ -26,30 +26,30 @@ internal sealed class DataSourceOptionsValidator<TOptions>(string section) : IVa
         var key = $"{section}:{setting}";
         if (address is null || address.OriginalString.Length == 0)
         {
-            yield return $"{key} is required.";
+            yield return OptionsValidationMessages.Required(key);
             yield break;
         }
 
         if (!address.IsAbsoluteUri)
         {
-            yield return $"{key} must be an absolute URI.";
+            yield return OptionsValidationMessages.NotAbsolute(key);
             yield break;
         }
 
         var secure = address.Scheme == Uri.UriSchemeHttps || (address.Scheme == Uri.UriSchemeHttp && address.IsLoopback);
         if (!secure)
         {
-            yield return $"{key} must use https; plain http is allowed only for loopback hosts.";
+            yield return OptionsValidationMessages.NotSecure(key);
         }
 
         if (address.UserInfo.Length > 0)
         {
-            yield return $"{key} must not contain credentials; use the source's key or token setting.";
+            yield return OptionsValidationMessages.HasCredentials(key);
         }
 
         if (!address.AbsolutePath.EndsWith('/'))
         {
-            yield return $"{key} must end with '/' so relative request paths keep its path.";
+            yield return OptionsValidationMessages.NoTrailingSlash(key);
         }
     }
 }

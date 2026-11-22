@@ -61,17 +61,17 @@ public sealed record AggregationRequest(
     {
         if (From > To)
         {
-            yield return new ValidationResult("The field from must not be later than to.", [nameof(From)]);
+            yield return new ValidationResult(ValidationMessages.FromAfterTo, [nameof(From)]);
         }
 
         if (!SortParameters.TryParseField(SortBy, out _))
         {
-            yield return new ValidationResult($"The field sortBy must be one of: {SortParameters.FieldNames}.", [nameof(SortBy)]);
+            yield return new ValidationResult(ValidationMessages.UnknownSortField, [nameof(SortBy)]);
         }
 
         if (!SortParameters.TryParseDirection(SortOrder, out _))
         {
-            yield return new ValidationResult($"The field sortOrder must be one of: {SortParameters.DirectionNames}.", [nameof(SortOrder)]);
+            yield return new ValidationResult(ValidationMessages.UnknownSortDirection, [nameof(SortOrder)]);
         }
     }
 
