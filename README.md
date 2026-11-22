@@ -259,6 +259,8 @@ dotnet run --project src/Aggregator.AppHost     # Aspire dashboard + API
 
 Package versions are managed centrally in `Directory.Packages.props`. Shared build settings (net11.0, nullable, warnings as errors) live in `Directory.Build.props`.
 
+CI (`.github/workflows/ci.yml`) builds, checks formatting and runs the tests with coverage on every push and pull request to `main`. `.gitattributes` checks text out as CRLF, which `.editorconfig` expects, so the format check also passes on Linux.
+
 ## Package compatibility on net11.0
 
 Checked on 2026-11-21 with SDK 11.0.100: restore and build produce no warnings.
@@ -283,6 +285,7 @@ Checked on 2026-11-21 with SDK 11.0.100: restore and build produce no warnings.
 | RichardSzalay.MockHttp | 7.1.0 | HTTP in unit tests |
 | WireMock.Net.Minimal | 2.32.0 | HTTP in integration tests |
 | Microsoft.Extensions.Diagnostics.Testing | 11.0.1 | `FakeLogger` |
+| BenchmarkDotNet | 0.15.8 | runs on .NET 11.0.0 with `InProcessEmitToolchain`, so it needs no generated project (checked 2026-11-22) |
 
 Not used, and why:
 
@@ -292,4 +295,4 @@ Not used, and why:
 
 - **WireMock.Net 2.32.0** (the full package) pulls in Microsoft.CodeAnalysis.CSharp 5.9 through its protobuf support, which conflicts with the 5.0 pin the architecture tests use (NU1109). `WireMock.Net.Minimal` has everything the tests need without it.
 
-Still to check when they are added: BenchmarkDotNet, Stryker.NET.
+Still to check when it is added: Stryker.NET (with the mutation run in ADR-0014).
