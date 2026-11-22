@@ -1,8 +1,10 @@
 using System.Net.Http.Headers;
 using Aggregator.Application.Sources;
+using Aggregator.Application.Statistics;
 using Aggregator.Infrastructure.Sources.Caching;
 using Aggregator.Infrastructure.Sources.Http;
 using Aggregator.Infrastructure.Sources.Resilience;
+using Aggregator.Infrastructure.Statistics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -32,6 +34,7 @@ public static class DataSourceServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
         services.TryAddSingleton(TimeProvider.System);
+        services.AddStatistics();
         services.AddSourceCaching();
         services.AddSourceCacheOptions(name, DataSourceOptions.SectionFor(name));
         services.AddSingleton<IDataSource>(provider =>
@@ -45,11 +48,17 @@ public static class DataSourceServiceCollectionExtensions
                 time,
                 cache.LastKnownGoodTtl);
             return cache.Enabled
-                ? new CachedDataSource(resilient, provider.GetRequiredService<ISourceCache>(), cache.Ttl, time, provider.GetRequiredService<SourceCacheMetrics>())
+                ? new CachedDataSource(
+                    resilient,
+                    provider.GetRequiredService<ISourceCache>(),
+                    cache.Ttl,
+                    time,
+                    provider.GetRequiredService<SourceCacheMetrics>(),
+                    provider.GetRequiredService<ISourceTelemetry>())
                 : resilient;
         });
 
-        return services.AddProvider<TSource, TOptions>(name, DataSourceOptions.SectionFor(name), clientName: name);
+        return services.AddProvider<TSource, TOptions>(new UpstreamApi(name, null), DataSourceOptions.SectionFor(name), clientName: name);
     }
 
     /// <summary>
@@ -66,10 +75,14 @@ public static class DataSourceServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(providerName);
 
         services.AddKeyedSingleton(SecondaryClientName(name), (provider, _) => Provider<TSource, TOptions>(provider, name, providerName));
-        return services.AddProvider<TSource, TOptions>(name, DataSourceOptions.SecondarySectionFor(name), SecondaryClientName(name));
+        return services.AddProvider<TSource, TOptions>(new UpstreamApi(name, providerName), DataSourceOptions.SecondarySectionFor(name), SecondaryClientName(name));
     }
 
-    private static IHttpClientBuilder AddProvider<TSource, TOptions>(this IServiceCollection services, string name, string section, string clientName)
+    /// <summary>
+    /// Handlers, outermost first: statistics, the standard resilience pipeline, attempt counting, chaos, then rate-limit logging and any the caller adds.
+    /// Statistics sits outside resilience so it measures what the caller waits for; attempt counting sits inside so it sees every retry.
+    /// </summary>
+    private static IHttpClientBuilder AddProvider<TSource, TOptions>(this IServiceCollection services, UpstreamApi api, string section, string clientName)
         where TSource : class, IDataSource
         where TOptions : DataSourceOptions, new()
     {
@@ -92,15 +105,10 @@ public static class DataSourceServiceCollectionExtensions
             client.MaxResponseContentBufferSize = MaxResponseBytes;
             client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(UserAgentProduct, UserAgentVersion));
         });
-
-        // The shared default pipeline has no client name, so it cannot read this client's tuned options; a named one replaces it.
-        // RemoveAllResilienceHandlers is the library's supported way to do that, though still marked experimental.
-#pragma warning disable EXTEXP0001
-        builder.RemoveAllResilienceHandlers().AddStandardResilienceHandler();
-#pragma warning restore EXTEXP0001
+        builder.AddMeasuredStandardResilience(api);
         builder.AddSourceChaos(section);
 
-        return builder.AddHttpMessageHandler(provider => new RateLimitLoggingHandler(provider.GetRequiredService<ILogger<RateLimitLoggingHandler>>(), name));
+        return builder.AddHttpMessageHandler(provider => new RateLimitLoggingHandler(provider.GetRequiredService<ILogger<RateLimitLoggingHandler>>(), api.Source));
     }
 
     private static SourceProvider Provider<TSource, TOptions>(IServiceProvider provider, string name, string providerName)

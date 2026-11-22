@@ -1,6 +1,7 @@
 using Aggregator.Application.Aggregation;
 using Aggregator.Application.Aggregation.Sorting;
 using Aggregator.Application.Sources;
+using Aggregator.Application.Statistics;
 using Aggregator.Application.UnitTests.TestData;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using NSubstitute;
@@ -19,6 +20,7 @@ public sealed class CachedDataSourceTests : IDisposable
     private readonly FakeSourceCache _cache;
     private readonly TestMeterFactory _meters = new();
     private readonly MetricCollector<long> _lookups;
+    private readonly ISourceTelemetry _telemetry = Substitute.For<ISourceTelemetry>();
 
     public CachedDataSourceTests()
     {
@@ -56,6 +58,7 @@ public sealed class CachedDataSourceTests : IDisposable
         fetched.ShouldBeOfType(expected);
         _cache.Stored.Count.ShouldBe(cached ? 1 : 0);
         LookupResults().ShouldBe([lookup]);
+        _telemetry.DidNotReceiveWithAnyArgs().RecordCacheHit(default);
     }
 
     [Theory]
@@ -76,6 +79,7 @@ public sealed class CachedDataSourceTests : IDisposable
         cached.Provider.ShouldBe(provider);
         await upstream.Received(1).FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>());
         LookupResults().ShouldBe(["miss", "hit"]);
+        _telemetry.Received(1).RecordCacheHit(new UpstreamApi(Name, provider));
     }
 
     [Fact]
@@ -143,6 +147,7 @@ public sealed class CachedDataSourceTests : IDisposable
 
         result.ShouldBeOfType<SourceCached>().Age.ShouldBe(TimeSpan.Zero);
         await upstream.DidNotReceive().FetchAsync(Arg.Any<AggregationQuery>(), Arg.Any<CancellationToken>());
+        _telemetry.Received(1).RecordCacheHit(new UpstreamApi(Name, null));
     }
 
     [Fact]
@@ -196,7 +201,7 @@ public sealed class CachedDataSourceTests : IDisposable
     [InlineData(-1)]
     public void Constructor_ShouldThrow_WhenTheTimeToLiveIsNotPositive(int ttlSeconds) =>
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            new CachedDataSource(TestSources.Returning(Name, Result(Inner.Success)), _cache, TimeSpan.FromSeconds(ttlSeconds), _clock, new SourceCacheMetrics(_meters)));
+            new CachedDataSource(TestSources.Returning(Name, Result(Inner.Success)), _cache, TimeSpan.FromSeconds(ttlSeconds), _clock, new SourceCacheMetrics(_meters), _telemetry));
 
     public void Dispose()
     {
@@ -204,7 +209,7 @@ public sealed class CachedDataSourceTests : IDisposable
         _meters.Dispose();
     }
 
-    private CachedDataSource Cached(IDataSource inner) => new(inner, _cache, Ttl, _clock, new SourceCacheMetrics(_meters));
+    private CachedDataSource Cached(IDataSource inner) => new(inner, _cache, Ttl, _clock, new SourceCacheMetrics(_meters), _telemetry);
 
     private List<string?> LookupResults() =>
         [.. _lookups.GetMeasurementSnapshot().Select(m =>
