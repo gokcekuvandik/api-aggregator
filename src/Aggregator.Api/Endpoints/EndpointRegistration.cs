@@ -13,8 +13,9 @@ internal static class EndpointRegistration
             .HasApiVersion(1, 0)
             .RequireAuthorization()
             .RequireRateLimiting(CallerRateLimiting.PolicyName)
-            // Built-in validation runs outside this filter, so its 400s are logged only by the access log.
+            // The logging interceptor wraps validation, so a rejected request is logged with its invalid fields.
             .AddEndpointFilter<EndpointLoggingFilter>()
+            .AddEndpointFilter<ValidationInterceptor>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);

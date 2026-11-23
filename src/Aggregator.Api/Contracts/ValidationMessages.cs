@@ -8,4 +8,8 @@ internal static class ValidationMessages
     public const string UnknownSortDirection = $"The field sortOrder must be one of: {SortParameters.DirectionNames}.";
     public const string InvalidSortField = $"sortBy must be one of: {SortParameters.FieldNames}.";
     public const string InvalidSortDirection = $"sortOrder must be one of: {SortParameters.DirectionNames}.";
+
+    // FluentValidation fills the placeholders with the field's wire name and the rule's limits.
+    public const string TooLong = "The field {PropertyName} must be a string with a maximum length of {MaxLength}.";
+    public const string OutOfRange = "The field {PropertyName} must be between {From} and {To}.";
 }

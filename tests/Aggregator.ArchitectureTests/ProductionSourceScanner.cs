@@ -31,6 +31,8 @@ internal static class ProductionSourceScanner
     private const string ProblemInitializerShape = "Title or Detail initializer";
     private const string ErrorEntryShape = "errors[...] assignment";
     private const string YieldShape = "yield return in a string iterator";
+    private const string WithMessageMethod = "WithMessage";
+    private const string WithMessageShape = "FluentValidation WithMessage";
 
     public static IReadOnlyList<string> SourceFiles() => RepositoryPaths.SourceFiles(SourceDirectory, "*.cs");
 
@@ -50,7 +52,7 @@ internal static class ProductionSourceScanner
 
     /// <summary>Every message call shape the scanner knows; each must match real code, or its rule arm is dead.</summary>
     public static readonly IReadOnlyList<string> MessageShapes =
-        [MessageObjectShape, TargetTypedShape, OptionsFailShape, OptionsValidateShape, FailureListShape, ProblemArgumentShape, ProblemInitializerShape, ErrorEntryShape, YieldShape];
+        [MessageObjectShape, TargetTypedShape, OptionsFailShape, OptionsValidateShape, FailureListShape, ProblemArgumentShape, ProblemInitializerShape, ErrorEntryShape, YieldShape, WithMessageShape];
 
     /// <summary>One <c>file:line</c> entry per user-facing message written as a literal at its call site.</summary>
     public static IReadOnlyList<string> FindInlineMessages(string source, string path) =>
@@ -101,6 +103,8 @@ internal static class ProductionSourceScanner
             (OptionsValidateShape, invocation.ArgumentList.Arguments[1].Expression),
         MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.Text: FailureListName }, Name: var method } when FailureListMethods.Contains(method.Identifier.Text) =>
             (FailureListShape, FirstArgument(invocation.ArgumentList)),
+        MemberAccessExpressionSyntax { Name.Identifier.Text: WithMessageMethod } =>
+            (WithMessageShape, FirstArgument(invocation.ArgumentList)),
         _ => (string.Empty, null),
     };
 

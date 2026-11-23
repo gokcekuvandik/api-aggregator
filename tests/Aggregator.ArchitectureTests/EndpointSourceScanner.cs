@@ -21,4 +21,15 @@ internal static class EndpointSourceScanner
             .DescendantNodes()
             .OfType<TryStatementSyntax>()
             .Select(statement => $"{path}:{statement.GetLocation().GetLineSpan().StartLinePosition.Line + 1}")];
+
+    /// <summary>One <c>file:line</c> entry per <c>Validate(...)</c> call or <c>ValidationProblem</c> reference, which belong to the validation interceptor.</summary>
+    public static IReadOnlyList<string> FindValidationCode(string source, string path) =>
+        [.. CSharpSyntaxTree.ParseText(source, path: path)
+            .GetRoot()
+            .DescendantNodes()
+            .OfType<SimpleNameSyntax>()
+            .Where(name => name.Identifier.ValueText == "ValidationProblem"
+                || (name.Identifier.ValueText == "Validate" && name.Parent is MemberAccessExpressionSyntax { Parent: InvocationExpressionSyntax }))
+            .Select(name => $"{path}:{name.GetLocation().GetLineSpan().StartLinePosition.Line + 1}")
+            .Distinct(StringComparer.Ordinal)];
 }

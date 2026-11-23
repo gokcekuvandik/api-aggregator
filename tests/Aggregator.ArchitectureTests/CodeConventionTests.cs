@@ -55,11 +55,12 @@ public sealed class CodeConventionTests
                 static ValidationResult K() => new("bad");
                 void L() { static ValidationResult Local() => new("bad"); }
                 IEnumerable<string> M(string key) { yield return Describe(key, "is required"); }
+                void N(Rules rules) { rules.RuleFor(x => x.Page).GreaterThan(0).WithMessage("too small"); }
             }
             """;
 
         ProductionSourceScanner.FindInlineMessages(source, "Sample.cs").ShouldBe(
-            ["Sample.cs:3", "Sample.cs:4", "Sample.cs:5", "Sample.cs:6", "Sample.cs:7", "Sample.cs:8", "Sample.cs:9", "Sample.cs:10", "Sample.cs:11", "Sample.cs:12", "Sample.cs:13", "Sample.cs:14", "Sample.cs:15"]);
+            ["Sample.cs:3", "Sample.cs:4", "Sample.cs:5", "Sample.cs:6", "Sample.cs:7", "Sample.cs:8", "Sample.cs:9", "Sample.cs:10", "Sample.cs:11", "Sample.cs:12", "Sample.cs:13", "Sample.cs:14", "Sample.cs:15", "Sample.cs:16"]);
         ProductionSourceScanner.MatchedShapes(source, "Sample.cs").ShouldBe(ProductionSourceScanner.MessageShapes, ignoreOrder: true);
     }
 
@@ -76,6 +77,7 @@ public sealed class CodeConventionTests
                 string E() => "plain data";
                 object F(Circuit circuit) => circuit.Fail("broken");
                 IEnumerable<SseItem> G() { yield return new SseItem("done"); }
+                void H(Rules rules) { rules.RuleFor(x => x.Page).GreaterThan(0).WithMessage(ValidationMessages.OutOfRange); }
             }
             """;
 

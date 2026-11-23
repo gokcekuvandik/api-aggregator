@@ -34,6 +34,45 @@ public sealed class CrossCuttingConventionTests
     }
 
     [Fact]
+    public async Task Endpoints_ShouldNotValidateRequests_WhenSourceIsScanned()
+    {
+        var files = EndpointSourceScanner.EndpointFiles();
+        var violations = new List<string>();
+
+        foreach (var file in files)
+        {
+            var source = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
+            violations.AddRange(EndpointSourceScanner.FindValidationCode(source, file));
+        }
+
+        files.ShouldNotBeEmpty();
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ValidationScan_ShouldReportLines_WhenEndpointValidatesItself()
+    {
+        const string source = """
+            class Sample
+            {
+                object Run(Service service, Query query)
+                {
+                    var errors = service.Validate(query);
+                    return TypedResults.ValidationProblem(errors);
+                }
+            }
+            """;
+
+        EndpointSourceScanner.FindValidationCode(source, "Sample.cs").ShouldBe(["Sample.cs:5", "Sample.cs:6"]);
+    }
+
+    [Fact]
+    public void ApiTypes_ShouldNotImplementIValidatableObject_WhenValidatorsOwnTheRules() =>
+        ApiAssembly.GetTypes().Where(type => type.IsAssignableTo(typeof(System.ComponentModel.DataAnnotations.IValidatableObject)))
+            .Select(type => type.FullName)
+            .ShouldBeEmpty();
+
+    [Fact]
     public async Task ApiLogTemplates_ShouldTakeFieldNamesFromLogFields_WhenSourceIsScanned()
     {
         var files = RepositoryPaths.SourceFiles(Path.Combine(RepositoryPaths.Root(), "src", "Aggregator.Api"), "*.cs");

@@ -28,6 +28,21 @@ public sealed class EndpointLoggingTests(AggregatorApiFactory factory) : IClassF
     }
 
     [Fact]
+    public async Task RejectedRequest_ShouldLogFieldNamesOnly_WhenPageSizeIsOutOfRange()
+    {
+        const string hugePageSize = "987654";
+        var logs = new CapturingLoggerProvider();
+        using var client = factory.CreateClientWithLogs(logs, StubDataSource.InState("news", "Success"));
+
+        using var response = await client.GetAsync($"{ApiRoutes.Aggregation}?pageSize={hugePageSize}", TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var entry = logs.InCategory(FilterCategory).ShouldHaveSingleItem();
+        entry.State["InvalidFields"].ShouldBe("pageSize");
+        entry.AllText.ShouldNotContain(hugePageSize);
+    }
+
+    [Fact]
     public async Task FailedRequest_ShouldLogEndpointAndStatus_WhenEverySourceFails()
     {
         var logs = new CapturingLoggerProvider();

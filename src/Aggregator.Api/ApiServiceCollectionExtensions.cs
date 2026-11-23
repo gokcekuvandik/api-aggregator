@@ -1,7 +1,10 @@
+using System.Reflection;
 using System.Text.Json.Serialization;
+using Aggregator.Api.Contracts;
 using Aggregator.Api.Http;
 using Aggregator.Api.Security;
 using Asp.Versioning;
+using FluentValidation;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.OpenApi;
 
@@ -25,7 +28,9 @@ internal static class ApiServiceCollectionExtensions
             options.CombineLogs = true;
         });
 
-        services.AddValidation();
+        // Messages name a field by its wire name from [Display], the same name the 400 body uses as its key.
+        ValidatorOptions.Global.DisplayNameResolver = (_, member, _) => member?.GetCustomAttribute<System.ComponentModel.DataAnnotations.DisplayAttribute>()?.Name;
+        services.AddValidatorsFromAssemblyContaining<AggregationRequestValidator>(ServiceLifetime.Singleton, includeInternalTypes: true);
 
         services.ConfigureHttpJsonOptions(options => options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict);
 
