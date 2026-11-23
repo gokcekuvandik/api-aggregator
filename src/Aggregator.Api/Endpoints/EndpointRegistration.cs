@@ -14,7 +14,7 @@ internal static class EndpointRegistration
             .RequireAuthorization()
             .RequireRateLimiting(CallerRateLimiting.PolicyName)
             // The logging interceptor wraps validation, so a rejected request is logged with its invalid fields.
-            .AddEndpointFilter<EndpointLoggingFilter>()
+            .AddEndpointFilter<EndpointLoggingInterceptor>()
             .AddEndpointFilter<ValidationInterceptor>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)

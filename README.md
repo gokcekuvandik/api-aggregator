@@ -166,7 +166,7 @@ There is no mediator. Each concern has one home in an ASP.NET Core extension poi
 | Concern | Where it lives | Status |
 |---|---|---|
 | Access log | `UseHttpLogging`: method, path, status and duration in one entry. Query strings, headers and bodies are never logged, so tokens cannot leak. Health probes opt out where they are mapped (`WithHttpLogging(None)`). | done |
-| Endpoint outcome log | `EndpointLoggingFilter` on the `/api/v1` group: one Warning per 4xx or 5xx result with `EndpointName`, `StatusCode` and, for a validation failure the handler returns, `InvalidFields` (names only, never values). It wraps the validation interceptor, so rejected requests are logged too. Successful calls are left to the access log. Field names come from `LogFields`. | done |
+| Endpoint outcome log | `EndpointLoggingInterceptor` on the `/api/v1` group: one Warning per 4xx or 5xx result with `EndpointName`, `StatusCode` and, for a validation failure the handler returns, `InvalidFields` (names only, never values). It wraps the validation interceptor, so rejected requests are logged too. Successful calls are left to the access log. Field names come from `LogFields`. | done |
 | Exception handling | `UseExceptionHandler` + `UnhandledExceptionHandler`: logs once with method and path, answers 500 ProblemDetails without details. A request the client aborts is written as 499 by the access log and never logged as an error. | done |
 | Validation | FluentValidation: `AbstractValidator<T>` classes are registered from the assembly, and `ValidationInterceptor` on the `/api/v1` group validates every endpoint argument that has one. All failures come back in one 400 ProblemDetails before the handler runs, so endpoints hold no validation code (architecture test). Messages live in `ValidationMessages` and name fields by their `[Display]` wire name; the DataAnnotations attributes on the request stay only for the OpenAPI schema. | done |
 | Authentication, authorization, rate limiting | `UseAuthentication`, `UseAuthorization`, `UseRateLimiter`; the `/api/v1` group requires a signed-in caller and the `per-caller` limit, and each endpoint names its scope policy | done |
@@ -180,7 +180,7 @@ sequenceDiagram
     participant L as HttpLogging
     participant E as ExceptionHandler
     participant A as Auth + RateLimiter
-    participant F as EndpointLoggingFilter
+    participant F as EndpointLoggingInterceptor
     participant V as ValidationInterceptor
     participant H as Endpoint
     participant S as IDataSource decorators (planned)

@@ -4,7 +4,7 @@ namespace Aggregator.Api.Http;
 /// Logs an API call that answers with an error status, with its endpoint name and, for a validation failure, the names of the invalid fields.
 /// Field values are never logged, and a successful call is left to the access log.
 /// </summary>
-internal sealed partial class EndpointLoggingFilter(ILogger<EndpointLoggingFilter> logger) : IEndpointFilter
+internal sealed partial class EndpointLoggingInterceptor(ILogger<EndpointLoggingInterceptor> logger) : IEndpointFilter
 {
     private const int FirstErrorStatus = StatusCodes.Status400BadRequest;
 
