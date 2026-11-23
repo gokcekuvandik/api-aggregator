@@ -27,8 +27,6 @@ internal sealed class ValidationInterceptor : IEndpointFilter
             return await next(context);
         }
 
-        return TypedResults.ValidationProblem(failures
-            .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Select(failure => failure.ErrorMessage).ToArray(), StringComparer.Ordinal));
+        return TypedResults.ValidationProblem(new ValidationResult(failures).ToDictionary());
     }
 }

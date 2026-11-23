@@ -7,7 +7,6 @@ namespace Aggregator.Api.IntegrationTests.CrossCutting;
 /// <summary>An unhandled exception is logged once with request context and answered with a safe 500.</summary>
 public sealed class ExceptionHandlerTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
-    private const string HttpLogCategory = "Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware";
 
     [Fact]
     public async Task UnhandledException_ShouldBeLoggedOnceWithRequestContext_WhenSourceThrows()
@@ -50,7 +49,7 @@ public sealed class ExceptionHandlerTests(AggregatorApiFactory factory) : IClass
 
         await Should.ThrowAsync<OperationCanceledException>(() => client.GetAsync(ApiRoutes.Aggregation, cancel.Token));
 
-        var accessLog = await logs.WaitForEntryAsync(HttpLogCategory, TimeSpan.FromSeconds(10));
+        var accessLog = await logs.WaitForEntryAsync(LogCategories.HttpLogging, TimeSpan.FromSeconds(10));
         accessLog.State["StatusCode"].ShouldBe("499");
         logs.Entries.ShouldNotContain(entry => entry.Level >= LogLevel.Error);
     }

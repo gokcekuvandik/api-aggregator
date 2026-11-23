@@ -8,7 +8,7 @@ namespace Aggregator.Api.Contracts;
 
 /// <summary>
 /// Query string of <c>GET /api/v1/aggregation</c>.
-/// Defaults sit on the constructor parameters so binding treats them as optional.
+/// Defaults sit on the constructor parameters so binding treats them as optional, and the attributes only describe the OpenAPI schema.
 /// Blank text values count as missing; <c>sources</c> is a comma-separated list of source names.
 /// </summary>
 public sealed record AggregationRequest(

@@ -59,7 +59,7 @@ internal static class ProductionSourceScanner
         [.. MessageSites(source, path)
             .Select(site => site.Expression)
             .Where(ContainsStringLiteral)
-            .Select(expression => $"{path}:{expression.GetLocation().GetLineSpan().StartLinePosition.Line + 1}")
+            .Select(expression => expression.FileLine(path))
             .Distinct(StringComparer.Ordinal)];
 
     /// <summary>The message shapes the file holds, with or without a literal.</summary>

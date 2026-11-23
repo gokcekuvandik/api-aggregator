@@ -12,15 +12,15 @@ internal sealed class AggregationRequestValidator : AbstractValidator<Aggregatio
 {
     public AggregationRequestValidator(AggregationService service)
     {
-        RuleFor(request => request.Q).MaximumLength(AggregationRequest.MaxTextLength).WithMessage(ValidationMessages.TooLong);
-        RuleFor(request => request.City).MaximumLength(AggregationRequest.MaxCityLength).WithMessage(ValidationMessages.TooLong);
-        RuleFor(request => request.Sources).MaximumLength(AggregationRequest.MaxTextLength).WithMessage(ValidationMessages.TooLong);
-        RuleFor(request => request.Category).MaximumLength(AggregationRequest.MaxNameLength).WithMessage(ValidationMessages.TooLong);
+        RuleFor(request => request.Q).NoLongerThan(AggregationRequest.MaxTextLength);
+        RuleFor(request => request.City).NoLongerThan(AggregationRequest.MaxCityLength);
+        RuleFor(request => request.Sources).NoLongerThan(AggregationRequest.MaxTextLength);
+        RuleFor(request => request.Category).NoLongerThan(AggregationRequest.MaxNameLength);
         RuleFor(request => request.SortBy).Cascade(CascadeMode.Stop)
-            .MaximumLength(AggregationRequest.MaxNameLength).WithMessage(ValidationMessages.TooLong)
+            .NoLongerThan(AggregationRequest.MaxNameLength)
             .Must(value => SortParameters.TryParseField(value, out _)).WithMessage(ValidationMessages.UnknownSortField);
         RuleFor(request => request.SortOrder).Cascade(CascadeMode.Stop)
-            .MaximumLength(AggregationRequest.MaxNameLength).WithMessage(ValidationMessages.TooLong)
+            .NoLongerThan(AggregationRequest.MaxNameLength)
             .Must(value => SortParameters.TryParseDirection(value, out _)).WithMessage(ValidationMessages.UnknownSortDirection);
         RuleFor(request => request.Page).InclusiveBetween(1, int.MaxValue).WithMessage(ValidationMessages.OutOfRange);
         RuleFor(request => request.PageSize).InclusiveBetween(1, PageRequest.MaxPageSize).WithMessage(ValidationMessages.OutOfRange);
@@ -32,12 +32,9 @@ internal sealed class AggregationRequestValidator : AbstractValidator<Aggregatio
     private static void AddRegistryErrors(AggregationService service, AggregationRequest request, ValidationContext<AggregationRequest> context)
     {
         var query = (request with { SortBy = null, SortOrder = null }).ToQuery();
-        foreach (var (field, messages) in service.Validate(query))
+        foreach (var (field, message) in service.Validate(query).SelectMany(error => error.Value, (error, message) => (error.Key, message)))
         {
-            foreach (var message in messages)
-            {
-                context.AddFailure(field, message);
-            }
+            context.AddFailure(field, message);
         }
     }
 }

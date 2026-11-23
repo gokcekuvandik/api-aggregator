@@ -18,36 +18,12 @@ public sealed class CrossCuttingConventionTests
         Architecture.Types.ShouldContain(type => type.FullName == "Microsoft.Extensions.Logging.ILogger");
 
     [Fact]
-    public async Task Endpoints_ShouldNotContainTryStatements_WhenSourceIsScanned()
-    {
-        var files = EndpointSourceScanner.EndpointFiles();
-        var violations = new List<string>();
-
-        foreach (var file in files)
-        {
-            var source = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
-            violations.AddRange(EndpointSourceScanner.FindTryStatements(source, file));
-        }
-
-        files.ShouldNotBeEmpty();
-        violations.ShouldBeEmpty();
-    }
+    public async Task Endpoints_ShouldNotContainTryStatements_WhenSourceIsScanned() =>
+        (await ScanEndpointsAsync(EndpointSourceScanner.FindTryStatements)).ShouldBeEmpty();
 
     [Fact]
-    public async Task Endpoints_ShouldNotValidateRequests_WhenSourceIsScanned()
-    {
-        var files = EndpointSourceScanner.EndpointFiles();
-        var violations = new List<string>();
-
-        foreach (var file in files)
-        {
-            var source = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
-            violations.AddRange(EndpointSourceScanner.FindValidationCode(source, file));
-        }
-
-        files.ShouldNotBeEmpty();
-        violations.ShouldBeEmpty();
-    }
+    public async Task Endpoints_ShouldNotValidateRequests_WhenSourceIsScanned() =>
+        (await ScanEndpointsAsync(EndpointSourceScanner.FindValidationCode)).ShouldBeEmpty();
 
     [Fact]
     public void ValidationScan_ShouldReportLines_WhenEndpointValidatesItself()
@@ -75,7 +51,7 @@ public sealed class CrossCuttingConventionTests
     [Fact]
     public async Task ApiLogTemplates_ShouldTakeFieldNamesFromLogFields_WhenSourceIsScanned()
     {
-        var files = RepositoryPaths.SourceFiles(Path.Combine(RepositoryPaths.Root(), "src", "Aggregator.Api"), "*.cs");
+        var files = RepositoryPaths.SourceFiles(RepositoryPaths.ApiSourceDirectory(), "*.cs");
         var templates = 0;
         var violations = new List<string>();
 
@@ -141,4 +117,19 @@ public sealed class CrossCuttingConventionTests
     [Fact]
     public void TryScan_ShouldReportNothing_WhenSourceHasNoTry() =>
         EndpointSourceScanner.FindTryStatements("class Sample { void Run() { } }", "Sample.cs").ShouldBeEmpty();
+
+    private static async Task<List<string>> ScanEndpointsAsync(Func<string, string, IReadOnlyList<string>> scan)
+    {
+        var files = EndpointSourceScanner.EndpointFiles();
+        files.ShouldNotBeEmpty();
+
+        var violations = new List<string>();
+        foreach (var file in files)
+        {
+            var source = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
+            violations.AddRange(scan(source, file));
+        }
+
+        return violations;
+    }
 }

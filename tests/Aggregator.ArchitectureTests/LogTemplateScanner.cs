@@ -20,7 +20,7 @@ internal static partial class LogTemplateScanner
             .Where(template => template.DescendantNodesAndSelf()
                 .OfType<LiteralExpressionSyntax>()
                 .Any(literal => literal.IsKind(SyntaxKind.StringLiteralExpression) && LiteralPlaceholder().IsMatch(literal.Token.ValueText)))
-            .Select(template => $"{path}:{template.GetLocation().GetLineSpan().StartLinePosition.Line + 1}")];
+            .Select(template => template.FileLine(path))];
 
     public static int CountTemplates(string source) => Templates(source, path: string.Empty).Count();
 
