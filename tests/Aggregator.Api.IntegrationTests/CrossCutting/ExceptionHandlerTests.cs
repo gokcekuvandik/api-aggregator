@@ -7,6 +7,8 @@ namespace Aggregator.Api.IntegrationTests.CrossCutting;
 /// <summary>An unhandled exception is logged once with request context and answered with a safe 500.</summary>
 public sealed class ExceptionHandlerTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
+    private const string HttpLogCategory = "Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware";
+
     [Fact]
     public async Task UnhandledException_ShouldBeLoggedOnceWithRequestContext_WhenSourceThrows()
     {
@@ -35,6 +37,22 @@ public sealed class ExceptionHandlerTests(AggregatorApiFactory factory) : IClass
 
         response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
         logs.Entries.Where(entry => entry.Exception is not null).ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task AbortedRequest_ShouldNotBeLoggedAsError_WhenClientCancels()
+    {
+        var logs = new CapturingLoggerProvider();
+        var slow = new DelayedDataSource(StubDataSource.InState("news", "Success"), TimeSpan.FromSeconds(30));
+        using var client = factory.CreateClientWithLogs(logs, slow);
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancel.CancelAfter(TimeSpan.FromMilliseconds(300));
+
+        await Should.ThrowAsync<OperationCanceledException>(() => client.GetAsync(ApiRoutes.Aggregation, cancel.Token));
+
+        var accessLog = await logs.WaitForEntryAsync(HttpLogCategory, TimeSpan.FromSeconds(10));
+        accessLog.State["StatusCode"].ShouldBe("499");
+        logs.Entries.ShouldNotContain(entry => entry.Level >= LogLevel.Error);
     }
 
     [Fact]

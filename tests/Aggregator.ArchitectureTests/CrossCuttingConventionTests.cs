@@ -34,6 +34,56 @@ public sealed class CrossCuttingConventionTests
     }
 
     [Fact]
+    public async Task ApiLogTemplates_ShouldTakeFieldNamesFromLogFields_WhenSourceIsScanned()
+    {
+        var files = RepositoryPaths.SourceFiles(Path.Combine(RepositoryPaths.Root(), "src", "Aggregator.Api"), "*.cs");
+        var templates = 0;
+        var violations = new List<string>();
+
+        foreach (var file in files)
+        {
+            var source = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
+            templates += LogTemplateScanner.CountTemplates(source);
+            violations.AddRange(LogTemplateScanner.FindLiteralPlaceholders(source, file));
+        }
+
+        templates.ShouldBeGreaterThan(0);
+        violations.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("""[LoggerMessage(Level = LogLevel.Error, Message = "Failed {Path}")]""")]
+    [InlineData("""[LoggerMessage(LogLevel.Error, "Failed {Path}")]""")]
+    [InlineData("""[LoggerMessageAttribute(Message = "Failed " + "{Path}")]""")]
+    public void LogTemplateScan_ShouldReportLine_WhenPlaceholderIsLiteral(string attribute)
+    {
+        var source = $$"""
+            partial class Sample
+            {
+                {{attribute}}
+                static partial void Log(ILogger logger, string path);
+            }
+            """;
+
+        LogTemplateScanner.FindLiteralPlaceholders(source, "Sample.cs").ShouldBe(["Sample.cs:3"]);
+    }
+
+    [Fact]
+    public void LogTemplateScan_ShouldReportNothing_WhenPlaceholdersComeFromConstants()
+    {
+        const string source = """
+            partial class Sample
+            {
+                [LoggerMessage(Level = LogLevel.Error, Message = "Failed {" + LogFields.Path + "} after {{retries}}")]
+                static partial void Log(ILogger logger, string path);
+            }
+            """;
+
+        LogTemplateScanner.FindLiteralPlaceholders(source, "Sample.cs").ShouldBeEmpty();
+        LogTemplateScanner.CountTemplates(source).ShouldBe(1);
+    }
+
+    [Fact]
     public void TryScan_ShouldReportLine_WhenSourceHasTryCatch()
     {
         const string source = """

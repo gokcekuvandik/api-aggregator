@@ -166,7 +166,8 @@ There is no mediator. Each concern has one home in an ASP.NET Core extension poi
 | Concern | Where it lives | Status |
 |---|---|---|
 | Access log | `UseHttpLogging`: method, path, status and duration in one entry. Query strings, headers and bodies are never logged, so tokens cannot leak. Health probes opt out where they are mapped (`WithHttpLogging(None)`). | done |
-| Exception handling | `UseExceptionHandler` + `UnhandledExceptionHandler`: logs once with method and path, answers 500 ProblemDetails without details | done |
+| Endpoint outcome log | `EndpointLoggingFilter` on the `/api/v1` group: one Warning per 4xx or 5xx result with `EndpointName`, `StatusCode` and, for a validation failure the handler returns, `InvalidFields` (names only, never values). Successful calls are left to the access log. Field names come from `LogFields`. | done |
+| Exception handling | `UseExceptionHandler` + `UnhandledExceptionHandler`: logs once with method and path, answers 500 ProblemDetails without details. A request the client aborts is written as 499 by the access log and never logged as an error. | done |
 | Validation | `AddValidation`: requests reach the handler already validated, 400 ProblemDetails otherwise | done |
 | Authentication, authorization, rate limiting | `UseAuthentication`, `UseAuthorization`, `UseRateLimiter`; the `/api/v1` group requires a signed-in caller and the `per-caller` limit, and each endpoint names its scope policy | done |
 | Outbound resilience, rate-limit logs, conditional requests | Standard resilience handler plus `DelegatingHandler`s on each source's named `HttpClient` | done |
@@ -180,6 +181,7 @@ sequenceDiagram
     participant E as ExceptionHandler
     participant A as Auth + RateLimiter
     participant V as Validation filter
+    participant F as EndpointLoggingFilter
     participant H as Endpoint
     participant S as IDataSource decorators (planned)
     participant D as DelegatingHandlers (planned)
@@ -187,12 +189,14 @@ sequenceDiagram
     L->>E: next
     E->>A: next
     A->>V: next
-    V->>H: validated request
+    V->>F: validated request
+    F->>H: next
     H->>S: FetchAsync
     S->>D: HTTP call
     D-->>S: response
     S-->>H: SourceResult
-    H-->>E: 200 / 503
+    H-->>F: 200 / 400 / 503
+    F-->>E: logs 4xx and 5xx results
     E-->>L: or 500 ProblemDetails on an exception
     L-->>C: logs final status
 ```
@@ -257,6 +261,7 @@ Each decision was recorded as an architecture decision record (MADR 4). The reco
 | 0001 | Clean Architecture with ports and adapters |
 | 0002 | Minimal APIs and the HTTP contract |
 | 0003 | Cross-cutting concerns without a mediator |
+| 0003a | Logging and error interceptor |
 | 0004 | Pluggable data sources and the chosen external APIs |
 | 0005 | Unified item model, relevance, filtering and sorting |
 | 0006 | Parallel fan-out, resilience and fallback |
