@@ -8,7 +8,7 @@ namespace Aggregator.Api.Contracts;
 
 /// <summary>
 /// Query string of <c>GET /api/v1/aggregation</c>.
-/// Defaults sit on the constructor parameters so binding treats them as optional.
+/// Defaults sit on the constructor parameters so binding treats them as optional, and the attributes only describe the OpenAPI schema.
 /// Blank text values count as missing; <c>sources</c> is a comma-separated list of source names.
 /// </summary>
 public sealed record AggregationRequest(
@@ -51,31 +51,13 @@ public sealed record AggregationRequest(
     [FromQuery(Name = "pageSize")]
     [property: Display(Name = "pageSize")]
     [property: Range(1, PageRequest.MaxPageSize)]
-    int PageSize = PageRequest.DefaultPageSize) : IValidatableObject
+    int PageSize = PageRequest.DefaultPageSize)
 {
     public const int MaxTextLength = 200;
     public const int MaxCityLength = 100;
     public const int MaxNameLength = 50;
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (From > To)
-        {
-            yield return new ValidationResult(ValidationMessages.FromAfterTo, [nameof(From)]);
-        }
-
-        if (!SortParameters.TryParseField(SortBy, out _))
-        {
-            yield return new ValidationResult(ValidationMessages.UnknownSortField, [nameof(SortBy)]);
-        }
-
-        if (!SortParameters.TryParseDirection(SortOrder, out _))
-        {
-            yield return new ValidationResult(ValidationMessages.UnknownSortDirection, [nameof(SortOrder)]);
-        }
-    }
-
-    /// <summary>Call only on a request that passed validation.</summary>
+    /// <summary>Call only on a request that passed <see cref="AggregationRequestValidator"/>.</summary>
     public AggregationQuery ToQuery() => new(Page, PageSize)
     {
         Text = Q,

@@ -161,13 +161,14 @@ An upstream failure never becomes a 500. Each source turns HTTP errors, timeouts
 
 ## Cross-cutting concerns
 
-There is no mediator. Each concern has one home in an ASP.NET Core extension point, so endpoints contain business logic only. An architecture test fails if endpoint code uses `try` or depends on `Microsoft.Extensions.Logging`.
+There is no mediator. Each concern has one home in an ASP.NET Core extension point, so endpoints contain business logic only. An architecture test fails if endpoint code uses `try`, depends on `Microsoft.Extensions.Logging`, or validates its own input.
 
 | Concern | Where it lives | Status |
 |---|---|---|
 | Access log | `UseHttpLogging`: method, path, status and duration in one entry. Query strings, headers and bodies are never logged, so tokens cannot leak. Health probes opt out where they are mapped (`WithHttpLogging(None)`). | done |
-| Exception handling | `UseExceptionHandler` + `UnhandledExceptionHandler`: logs once with method and path, answers 500 ProblemDetails without details | done |
-| Validation | `AddValidation`: requests reach the handler already validated, 400 ProblemDetails otherwise | done |
+| Endpoint outcome log | `EndpointLoggingInterceptor` on the `/api/v1` group: one Warning per 4xx or 5xx result with `EndpointName`, `StatusCode` and, for a validation failure the handler returns, `InvalidFields` (names only, never values). It wraps the validation interceptor, so rejected requests are logged too. Successful calls are left to the access log. Field names come from `LogFields`. | done |
+| Exception handling | `UseExceptionHandler` + `UnhandledExceptionHandler`: logs once with method and path, answers 500 ProblemDetails without details. A request the client aborts is written as 499 by the access log and never logged as an error. | done |
+| Validation | FluentValidation: `AbstractValidator<T>` classes are registered from the assembly, and `ValidationInterceptor` on the `/api/v1` group validates every endpoint argument that has one. All failures come back in one 400 ProblemDetails before the handler runs, so endpoints hold no validation code (architecture test). Messages live in `ValidationMessages` and name fields by their `[Display]` wire name; the DataAnnotations attributes on the request stay only for the OpenAPI schema. | done |
 | Authentication, authorization, rate limiting | `UseAuthentication`, `UseAuthorization`, `UseRateLimiter`; the `/api/v1` group requires a signed-in caller and the `per-caller` limit, and each endpoint names its scope policy | done |
 | Outbound resilience, rate-limit logs, conditional requests | Standard resilience handler plus `DelegatingHandler`s on each source's named `HttpClient` | done |
 | Outbound statistics | `DelegatingHandler` on each source's named `HttpClient` | planned |
@@ -179,20 +180,24 @@ sequenceDiagram
     participant L as HttpLogging
     participant E as ExceptionHandler
     participant A as Auth + RateLimiter
-    participant V as Validation filter
+    participant F as EndpointLoggingInterceptor
+    participant V as ValidationInterceptor
     participant H as Endpoint
     participant S as IDataSource decorators (planned)
     participant D as DelegatingHandlers (planned)
     C->>L: request
     L->>E: next
     E->>A: next
-    A->>V: next
+    A->>F: next
+    F->>V: next
+    V-->>F: 400 with every failure, handler not called
     V->>H: validated request
     H->>S: FetchAsync
     S->>D: HTTP call
     D-->>S: response
     S-->>H: SourceResult
-    H-->>E: 200 / 503
+    H-->>F: 200 / 503
+    F-->>E: logs 4xx and 5xx results
     E-->>L: or 500 ProblemDetails on an exception
     L-->>C: logs final status
 ```
@@ -257,6 +262,8 @@ Each decision was recorded as an architecture decision record (MADR 4). The reco
 | 0001 | Clean Architecture with ports and adapters |
 | 0002 | Minimal APIs and the HTTP contract |
 | 0003 | Cross-cutting concerns without a mediator |
+| 0003a | Logging and error interceptor |
+| 0003b | FluentValidation interceptor |
 | 0004 | Pluggable data sources and the chosen external APIs |
 | 0005 | Unified item model, relevance, filtering and sorting |
 | 0006 | Parallel fan-out, resilience and fallback |

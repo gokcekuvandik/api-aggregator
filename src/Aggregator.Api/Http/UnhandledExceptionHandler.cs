@@ -30,6 +30,6 @@ internal sealed partial class UnhandledExceptionHandler(
         return true;
     }
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception while handling {Method} {Path}")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception while handling {" + LogFields.Method + "} {" + LogFields.Path + "}")]
     private static partial void LogUnhandled(ILogger logger, Exception exception, string method, string path);
 }

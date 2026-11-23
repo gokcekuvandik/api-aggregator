@@ -1,3 +1,4 @@
+using Aggregator.Api.Http;
 using Aggregator.Api.Security;
 
 namespace Aggregator.Api.Endpoints;
@@ -12,6 +13,9 @@ internal static class EndpointRegistration
             .HasApiVersion(1, 0)
             .RequireAuthorization()
             .RequireRateLimiting(CallerRateLimiting.PolicyName)
+            // The logging interceptor wraps validation, so a rejected request is logged with its invalid fields.
+            .AddEndpointFilter<EndpointLoggingInterceptor>()
+            .AddEndpointFilter<ValidationInterceptor>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);

@@ -16,7 +16,9 @@ internal static class ValidationErrorKeys
         }
 
         validation.Errors = validation.Errors
-            .GroupBy(error => JsonNamingPolicy.CamelCase.ConvertName(error.Key), StringComparer.Ordinal)
+            .GroupBy(error => ToWireName(error.Key), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.SelectMany(error => error.Value).ToArray(), StringComparer.Ordinal);
     }
+
+    public static string ToWireName(string key) => JsonNamingPolicy.CamelCase.ConvertName(key);
 }

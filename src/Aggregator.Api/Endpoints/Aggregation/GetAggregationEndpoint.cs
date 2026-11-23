@@ -26,19 +26,12 @@ public sealed class GetAggregationEndpoint : IEndpoint
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
-    private static async Task<Results<Ok<AggregationResponse>, ValidationProblem, ProblemHttpResult>> HandleAsync(
+    private static async Task<Results<Ok<AggregationResponse>, ProblemHttpResult>> HandleAsync(
         [AsParameters] AggregationRequest request,
         AggregationService service,
         CancellationToken cancellationToken)
     {
-        var query = request.ToQuery();
-        var errors = service.Validate(query);
-        if (errors.Count > 0)
-        {
-            return TypedResults.ValidationProblem(errors);
-        }
-
-        var result = await service.AggregateAsync(query, cancellationToken);
+        var result = await service.AggregateAsync(request.ToQuery(), cancellationToken);
         IReadOnlyList<SourceStatusResponse> sources = [.. result.Sources.Select(SourceStatusResponse.From)];
 
         if (!result.HasData)

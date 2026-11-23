@@ -11,7 +11,7 @@ namespace Aggregator.ArchitectureTests;
 internal static class EndpointSourceScanner
 {
     public static IReadOnlyList<string> EndpointFiles() =>
-        [.. Directory.EnumerateFiles(Path.Combine(RepositoryPaths.Root(), "src", "Aggregator.Api", "Endpoints"), "*.cs", SearchOption.AllDirectories)
+        [.. Directory.EnumerateFiles(Path.Combine(RepositoryPaths.ApiSourceDirectory(), "Endpoints"), "*.cs", SearchOption.AllDirectories)
             .Order(StringComparer.Ordinal)];
 
     /// <summary>One <c>file:line</c> entry per <c>try</c> statement in the source.</summary>
@@ -20,5 +20,16 @@ internal static class EndpointSourceScanner
             .GetRoot()
             .DescendantNodes()
             .OfType<TryStatementSyntax>()
-            .Select(statement => $"{path}:{statement.GetLocation().GetLineSpan().StartLinePosition.Line + 1}")];
+            .Select(statement => statement.FileLine(path))];
+
+    /// <summary>One <c>file:line</c> entry per <c>Validate(...)</c> call or <c>ValidationProblem</c> reference, which belong to the validation interceptor.</summary>
+    public static IReadOnlyList<string> FindValidationCode(string source, string path) =>
+        [.. CSharpSyntaxTree.ParseText(source, path: path)
+            .GetRoot()
+            .DescendantNodes()
+            .OfType<SimpleNameSyntax>()
+            .Where(name => name.Identifier.ValueText == "ValidationProblem"
+                || (name.Identifier.ValueText == "Validate" && name.Parent is MemberAccessExpressionSyntax { Parent: InvocationExpressionSyntax }))
+            .Select(name => name.FileLine(path))
+            .Distinct(StringComparer.Ordinal)];
 }

@@ -20,6 +20,8 @@ internal static class RepositoryPaths
         throw new InvalidOperationException($"No {SolutionFile} above '{AppContext.BaseDirectory}'.");
     }
 
+    public static string ApiSourceDirectory() => Path.Combine(Root(), "src", "Aggregator.Api");
+
     /// <summary>Files under <paramref name="directory"/> that match <paramref name="pattern"/>, without build output, in ordinal order.</summary>
     public static IReadOnlyList<string> SourceFiles(string directory, string pattern) =>
         [.. Directory.EnumerateFiles(directory, pattern, SearchOption.AllDirectories)

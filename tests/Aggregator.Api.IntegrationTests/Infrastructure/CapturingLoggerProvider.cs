@@ -31,6 +31,23 @@ public sealed class CapturingLoggerProvider : ILoggerProvider, ISupportExternalS
     public IReadOnlyList<CapturedLog> InCategory(string category) =>
         [.. _entries.Where(entry => entry.Category == category)];
 
+    /// <summary>The first entry in <paramref name="category"/>, waiting up to <paramref name="timeout"/> for a request that finishes after the client gave up on it.</summary>
+    public async Task<CapturedLog> WaitForEntryAsync(string category, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (_entries.FirstOrDefault(entry => entry.Category == category) is { } entry)
+            {
+                return entry;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(20));
+        }
+
+        throw new TimeoutException($"No log entry in category '{category}' within {timeout}.");
+    }
+
     public ILogger CreateLogger(string categoryName) => new CapturingLogger(categoryName, _entries, () => _scopes);
 
     public void SetScopeProvider(IExternalScopeProvider scopeProvider) => _scopes = scopeProvider;

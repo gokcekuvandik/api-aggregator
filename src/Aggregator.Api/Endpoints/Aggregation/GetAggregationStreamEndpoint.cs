@@ -26,17 +26,11 @@ public sealed class GetAggregationStreamEndpoint : IEndpoint
             .WithDescription(Description)
             .ProducesValidationProblem();
 
-    private static Results<ServerSentEventsResult<object>, ValidationProblem> Handle(
+    private static ServerSentEventsResult<object> Handle(
         [AsParameters] AggregationRequest request,
         AggregationService service,
-        CancellationToken cancellationToken)
-    {
-        var query = request.ToQuery();
-        var errors = service.Validate(query);
-        return errors.Count > 0
-            ? TypedResults.ValidationProblem(errors)
-            : TypedResults.ServerSentEvents(EventsAsync(service, query, cancellationToken));
-    }
+        CancellationToken cancellationToken) =>
+        TypedResults.ServerSentEvents(EventsAsync(service, request.ToQuery(), cancellationToken));
 
     private static async IAsyncEnumerable<SseItem<object>> EventsAsync(
         AggregationService service, AggregationQuery query, [EnumeratorCancellation] CancellationToken cancellationToken)

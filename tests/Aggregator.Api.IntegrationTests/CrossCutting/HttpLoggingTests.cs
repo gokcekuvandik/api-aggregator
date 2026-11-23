@@ -6,7 +6,6 @@ namespace Aggregator.Api.IntegrationTests.CrossCutting;
 /// <summary>One redacted access-log entry per request, none for health probes.</summary>
 public sealed class HttpLoggingTests(AggregatorApiFactory factory) : IClassFixture<AggregatorApiFactory>
 {
-    private const string HttpLogCategory = "Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware";
     private const string QueryToken = "query-token-7a2d4b";
 
     /// <summary>A valid token, so the request also passes through the bearer handler's own logging.</summary>
@@ -21,7 +20,7 @@ public sealed class HttpLoggingTests(AggregatorApiFactory factory) : IClassFixtu
         using var response = await client.GetAsync(ApiRoutes.Sources, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var entry = logs.InCategory(HttpLogCategory).ShouldHaveSingleItem();
+        var entry = logs.InCategory(LogCategories.HttpLogging).ShouldHaveSingleItem();
         entry.State["Method"].ShouldBe("GET");
         entry.State["Path"].ShouldBe(ApiRoutes.Sources);
         entry.State["StatusCode"].ShouldBe("200");
@@ -39,7 +38,7 @@ public sealed class HttpLoggingTests(AggregatorApiFactory factory) : IClassFixtu
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        logs.InCategory(HttpLogCategory).ShouldNotBeEmpty();
+        logs.InCategory(LogCategories.HttpLogging).ShouldNotBeEmpty();
         logs.Entries.ShouldAllBe(entry => !entry.AllText.Contains(HeaderToken) && !entry.AllText.Contains(QueryToken));
     }
 
@@ -54,7 +53,7 @@ public sealed class HttpLoggingTests(AggregatorApiFactory factory) : IClassFixtu
         using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        logs.InCategory(HttpLogCategory).ShouldBeEmpty();
+        logs.InCategory(LogCategories.HttpLogging).ShouldBeEmpty();
     }
 
     [Fact]
@@ -66,6 +65,6 @@ public sealed class HttpLoggingTests(AggregatorApiFactory factory) : IClassFixtu
         using var response = await client.GetAsync(ApiRoutes.Aggregation, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
-        logs.InCategory(HttpLogCategory).ShouldHaveSingleItem().State["StatusCode"].ShouldBe("500");
+        logs.InCategory(LogCategories.HttpLogging).ShouldHaveSingleItem().State["StatusCode"].ShouldBe("500");
     }
 }
