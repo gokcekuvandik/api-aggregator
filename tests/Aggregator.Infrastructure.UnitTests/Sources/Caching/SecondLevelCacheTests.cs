@@ -35,11 +35,24 @@ public sealed class SecondLevelCacheTests
     {
         using var provider = TestServices.BuildInfrastructure(new() { [ConnectionStringKey] = "redis.test:6380,password=secret" });
 
-        provider.GetRequiredService<IDistributedCache>().ShouldBeAssignableTo<RedisCache>();
+        provider.GetServices<IDistributedCache>().ShouldHaveSingleItem().ShouldBeOfType<CircuitBreakingDistributedCache>();
+        provider.GetService<RedisCache>().ShouldBeNull();
         var options = provider.GetRequiredService<IOptions<RedisCacheOptions>>().Value;
         options.InstanceName.ShouldBe(SecondLevelCacheServiceCollectionExtensions.InstanceName);
         options.ConfigurationOptions.ShouldNotBeNull().EndPoints.Single().ToString().ShouldBe("Unspecified/redis.test:6380");
         options.ConfigurationOptions.Password.ShouldBe("secret");
+    }
+
+    [Fact]
+    public void AddInfrastructure_ShouldPutRedisBehindTheBreaker_WhenTheHostRegisteredAnotherDistributedCacheFirst()
+    {
+        var services = TestServices.Create(new() { [ConnectionStringKey] = "localhost:6379" }, out var configuration);
+        services.AddDistributedMemoryCache();
+
+        services.AddInfrastructure(configuration);
+
+        var redis = services.Where(descriptor => descriptor.ServiceType == typeof(IDistributedCache)).ToList();
+        redis.ShouldHaveSingleItem().ImplementationFactory.ShouldNotBeNull();
     }
 
     [Fact]

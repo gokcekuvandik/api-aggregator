@@ -275,6 +275,7 @@ Each decision was recorded as an architecture decision record (MADR 4). The reco
 | 0012 | Runtime: .NET 11 |
 | 0013 | Topology: stateless modular monolith (below) |
 | 0014 | Testing strategy and development method (see Testing) |
+| 0014a | Testcontainers for the Redis second level |
 | 0015 | Code conventions (see Code conventions) |
 
 ### Topology and scaling (ADR-0013)
@@ -304,7 +305,7 @@ dotnet run --project src/Aggregator.AppHost --launch-profile scaled -- --ScaleOu
 | 3 replicas, L1 only | 36 |
 | 3 replicas, Redis L2 | 12 |
 
-When Redis is unreachable, its calls fail at once (no command backlog, a 1 s connect timeout and 500 ms per operation) and HybridCache keeps answering from memory. An entry another replica wrote in a shape this one cannot read counts as a miss and is fetched again.
+When Redis refuses connections, its calls fail at once (no command backlog, a 1 s connect timeout and 500 ms per operation). When it hangs instead, the first request pays those timeouts and a circuit breaker then skips Redis for 30 s, so later requests answer from memory in milliseconds; after that one request probes Redis and a success closes the breaker. Testing against a real, paused Redis showed every request otherwise waited 0.9 to 3 s. An entry another replica wrote in a shape this one cannot read counts as a miss and is fetched again.
 
 Cache keys hold the request text, such as the search term, in plain form; only keys over 256 characters are hashed. With Redis on, anyone who can read Redis can read those terms.
 
@@ -317,7 +318,7 @@ Built only when needed:
 
 ## Testing (ADR-0014)
 
-The code was written test first: a failing test, the smallest change that passes it, then a refactor. Every test runs offline. Upstream APIs are WireMock or MockHttp with recorded payloads from `tests/Fixtures`, and time-dependent rules take their timestamps as parameters.
+The code was written test first: a failing test, the smallest change that passes it, then a refactor. Every test runs offline. Upstream APIs are WireMock or MockHttp with recorded payloads from `tests/Fixtures`, and time-dependent rules take their timestamps as parameters. The Redis tests need Docker and a cached `redis:8.10` image; without Docker they are skipped locally, and CI fails instead of skipping them.
 
 Test names follow `Subject_ShouldOutcome_WhenCondition`; an unconditional rule drops the `_When` part. `TestNamingConventionTests` parses every test file with Roslyn and fails on a name that does not match.
 
@@ -325,6 +326,7 @@ Test names follow `Subject_ShouldOutcome_WhenCondition`; an unconditional rule d
 |---|---|---|
 | Unit | `Domain`, `Application`, `Infrastructure`, `AppHost` `.UnitTests` | xUnit v3 on Microsoft.Testing.Platform, Shouldly, NSubstitute, MockHttp, `FakeLogger`, `MetricCollector<T>`, `FakeTimeProvider` |
 | Integration | `Aggregator.Api.IntegrationTests` | `WebApplicationFactory`, WireMock.Net for latency, faults and 429, `JsonSnapshot` contract snapshots |
+| Integration (Redis) | `Aggregator.Infrastructure.IntegrationTests` | Testcontainers starts a real Redis: replicas share answers and last-known-good items, keys carry the `aggregator:` prefix, and a paused Redis is skipped after its first failure |
 | End to end | `Aggregator.EndToEndTests` | `Aspire.Hosting.Testing` starts the real AppHost and API process, with every source pointed at WireMock and a test signing key |
 | Architecture | `Aggregator.ArchitectureTests` | ArchUnitNET and Roslyn: layer rules, Domain purity, endpoint, telemetry, code and model conventions, topology, test names |
 
@@ -367,12 +369,18 @@ Requires the .NET 11 SDK (pinned in `global.json`).
 
 ```bash
 dotnet build                                   # warnings are errors (Directory.Build.props)
-dotnet test                                    # every project, end-to-end tests included (they start the AppHost; no Docker needed)
+dotnet test                                    # every project, end-to-end tests included; the Redis tests use Docker and are skipped without it
 dotnet tool restore                            # ReportGenerator and Stryker.NET, pinned in dotnet-tools.json
 dotnet test --results-directory TestResults --coverage --coverage-output-format cobertura --coverage-settings coverage.settings.xml && bash build/coverage.sh
 dotnet user-jwts create --project src/Aggregator.Api --scope aggregation:read --scope stats:read   # once, before the first run
 dotnet run --project src/Aggregator.AppHost     # Aspire dashboard + API
 dotnet run --project src/Aggregator.AppHost --launch-profile scaled   # 3 replicas + Redis (needs Docker)
+```
+
+The API maps nothing at `/`, so the root answers 404 ProblemDetails. Open `/scalar` instead; the dashboard links and the API's launch profiles already point there. To call `/api/v1` from Scalar, print a bare token and paste it into the **Authorize** dialog without a `Bearer ` prefix:
+
+```bash
+dotnet user-jwts create --project src/Aggregator.Api --scope aggregation:read --scope stats:read --output token
 ```
 
 Package versions are managed centrally in `Directory.Packages.props`. Shared build settings (net11.0, nullable, warnings as errors) live in `Directory.Build.props`.
@@ -406,6 +414,7 @@ Checked on 2026-11-21 with SDK 11.0.100: restore and build produce no warnings.
 | WireMock.Net.Minimal | 2.32.0 | HTTP in integration tests |
 | Microsoft.Extensions.Diagnostics.Testing | 11.0.1 | `FakeLogger` |
 | Aspire.Hosting.Testing | 17.0.0 | end-to-end tests; runs the AppHost without Docker while scale-out is off |
+| Testcontainers.Redis | 4.17.0 | Redis integration tests on `redis:8.10`, the image Aspire uses for scale-out |
 | BenchmarkDotNet | 0.15.8 | runs on .NET 11.0.0 with `InProcessEmitToolchain`, so it needs no generated project (checked 2026-11-22) |
 | dotnet-reportgenerator-globaltool | 5.6.1 | local tool. It has no coverage threshold option (an unknown `-minimumCoverageThresholds` is logged and exits 0), so `build/coverage.sh` applies the gate |
 | dotnet-stryker | 5.1.0 | local tool; `test-runner: mtp` drives xUnit v3 on Microsoft.Testing.Platform |
