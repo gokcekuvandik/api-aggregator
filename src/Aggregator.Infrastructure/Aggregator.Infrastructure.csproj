@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Aggregator.Infrastructure.UnitTests" />
+    <InternalsVisibleTo Include="Aggregator.Infrastructure.IntegrationTests" />
     <InternalsVisibleTo Include="Aggregator.Benchmarks" />
   </ItemGroup>
 

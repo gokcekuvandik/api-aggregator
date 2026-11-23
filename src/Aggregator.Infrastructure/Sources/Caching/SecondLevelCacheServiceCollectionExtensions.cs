@@ -1,6 +1,9 @@
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace Aggregator.Infrastructure.Sources.Caching;
@@ -35,6 +38,13 @@ internal static class SecondLevelCacheServiceCollectionExtensions
             options.InstanceName = InstanceName;
             options.ConfigurationOptions = FailFast(connectionString);
         });
+        // The library's own registration is moved behind the breaker, so its logging is kept and no other cache can shadow Redis.
+        var redis = services.Last(descriptor => descriptor.ServiceType == typeof(IDistributedCache) && descriptor.ImplementationType?.Assembly == typeof(RedisCacheOptions).Assembly);
+        services.RemoveAll<IDistributedCache>();
+        services.AddSingleton<IDistributedCache>(provider => new CircuitBreakingDistributedCache(
+            (IDistributedCache)ActivatorUtilities.CreateInstance(provider, redis.ImplementationType!),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<ILogger<CircuitBreakingDistributedCache>>()));
         services.AddOptions<RedisCacheOptions>()
             .Validate(options => options.ConfigurationOptions is not null, OptionsValidationMessages.InvalidRedisConnection(ConnectionStringName))
             .ValidateOnStart();
